@@ -22,9 +22,15 @@ export const authOptions = {
       },
 
       async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email and password are required");
+        }
+
         await connectDB();
 
-        const user = await User.findOne({ email: credentials.email });
+        const user = await User.findOne({
+          email: credentials.email.toLowerCase().trim(),
+        });
 
         if (!user) {
           throw new Error("User not found");

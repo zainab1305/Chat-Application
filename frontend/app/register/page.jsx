@@ -1,52 +1,47 @@
 "use client";
+
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function LoginPage() {
+export default function RegisterPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const isRegistered = searchParams.get("registered") === "1";
-
-  const handleCredentialsLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-      callbackUrl: "/chat",
+    const response = await fetch("/api/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ name, email, password }),
     });
 
+    const data = await response.json();
     setLoading(false);
 
-    if (result?.error) {
-      setError(result.error);
+    if (!response.ok) {
+      setError(data.error || "Failed to register");
       return;
     }
 
-    router.push("/chat");
+    router.push("/login?registered=1");
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md border rounded-lg p-6 space-y-4">
-        <h1 className="text-2xl font-bold">Login</h1>
-
-        {isRegistered && (
-          <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded p-2">
-            Registration successful. You can login now.
-          </p>
-        )}
+        <h1 className="text-2xl font-bold">Create Account</h1>
 
         {error && (
           <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2">
@@ -54,7 +49,16 @@ export default function LoginPage() {
           </p>
         )}
 
-        <form className="space-y-3" onSubmit={handleCredentialsLogin}>
+        <form className="space-y-3" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Name"
+            className="w-full border rounded px-3 py-2"
+            required
+          />
+
           <input
             type="email"
             value={email}
@@ -71,6 +75,7 @@ export default function LoginPage() {
             placeholder="Password"
             className="w-full border rounded px-3 py-2"
             required
+            minLength={6}
           />
 
           <button
@@ -78,7 +83,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-black text-white px-6 py-2 rounded disabled:opacity-60"
           >
-            {loading ? "Signing in..." : "Login with Email"}
+            {loading ? "Creating account..." : "Register"}
           </button>
         </form>
 
@@ -92,13 +97,13 @@ export default function LoginPage() {
           onClick={() => signIn("google", { callbackUrl: "/chat" })}
           className="w-full bg-white border text-black px-6 py-2 rounded"
         >
-          Sign in with Google
+          Continue with Google
         </button>
 
         <p className="text-sm text-center">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="underline">
-            Register
+          Already have an account?{" "}
+          <Link href="/login" className="underline">
+            Login
           </Link>
         </p>
       </div>
