@@ -1,3 +1,6 @@
+import "./globals.css";
+import AuthProvider from "@/providers/AuthProvider";
+
 export const metadata = {
   title: "Chat App",
   description: "Real-time chat using Socket.IO",
@@ -6,7 +9,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }
