@@ -5,6 +5,9 @@ import { connectDB } from "@/lib/db";
 import User from "@/models/User";
 import Room from "@/models/Room";
 
+const ROOM_CODE_LENGTH = 6;
+const ROOM_CODE_REGEX = new RegExp(`^[A-Z0-9]{${ROOM_CODE_LENGTH}}$`);
+
 export async function POST(req) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,10 +17,20 @@ export async function POST(req) {
     }
 
     const { code } = await req.json();
-    const normalizedCode = code?.toUpperCase().trim();
+    const normalizedCode = (code || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, ROOM_CODE_LENGTH);
 
     if (!normalizedCode) {
       return NextResponse.json({ error: "Room code is required" }, { status: 400 });
+    }
+
+    if (!ROOM_CODE_REGEX.test(normalizedCode)) {
+      return NextResponse.json(
+        { error: `Room code must be exactly ${ROOM_CODE_LENGTH} letters/numbers` },
+        { status: 400 }
+      );
     }
 
     await connectDB();

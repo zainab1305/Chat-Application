@@ -5,6 +5,7 @@ import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function DashboardClient() {
+  const ROOM_CODE_LENGTH = 6;
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -146,9 +147,20 @@ export default function DashboardClient() {
               <input
                 type="text"
                 value={joinRoomCode}
-                onChange={(e) => setJoinRoomCode(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  const sanitized = e.target.value
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9]/g, "")
+                    .slice(0, ROOM_CODE_LENGTH);
+
+                  setJoinRoomCode(sanitized);
+                }}
                 placeholder="Enter 6-char code"
-                maxLength={6}
+                minLength={ROOM_CODE_LENGTH}
+                maxLength={ROOM_CODE_LENGTH}
+                pattern="[A-Z0-9]{6}"
+                title="Room code must be exactly 6 letters or numbers"
+                autoComplete="off"
                 required
               />
 
