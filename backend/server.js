@@ -15,23 +15,67 @@ const io = new Server(server, {
   },
 });
 
+const roomUsers = new Map();
+
+function emitRoomUsers(roomId) {
+  const usersInRoom = roomUsers.get(roomId);
+  const onlineUsers = usersInRoom ? Array.from(usersInRoom.values()) : [];
+
+  return {
+    roomId,
+    users: onlineUsers,
+    count: onlineUsers.length,
+  };
+}
+
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
   socket.emit("welcome", "Welcome to the server!");
 
-  socket.on("joinRoom", ({ roomId }) => {
-    if (!roomId) return;
+  socket.on("joinRoom", ({ roomId, user }, callback) => {
+    if (!roomId || !user?.id) return;
 
     socket.join(roomId);
+
+    if (!roomUsers.has(roomId)) {
+      roomUsers.set(roomId, new Map());
+    }
+
+    const usersInRoom = roomUsers.get(roomId);
+    usersInRoom.set(socket.id, {
+      id: user.id,
+      name: user.name || user.email || "Anonymous",
+      email: user.email || "",
+    });
+
+    const snapshot = emitRoomUsers(roomId);
+
     socket.emit("roomJoined", { roomId });
+    io.to(roomId).emit("roomUsers", snapshot);
+
+    if (typeof callback === "function") {
+      callback(snapshot);
+    }
+
     console.log(`Socket ${socket.id} joined room ${roomId}`);
   });
 
   socket.on("leaveRoom", ({ roomId }) => {
     if (!roomId) return;
 
+    const usersInRoom = roomUsers.get(roomId);
+    if (usersInRoom) {
+      usersInRoom.delete(socket.id);
+
+      if (usersInRoom.size === 0) {
+        roomUsers.delete(roomId);
+      }
+    }
+
     socket.leave(roomId);
+    const snapshot = emitRoomUsers(roomId);
+    io.to(roomId).emit("roomUsers", snapshot);
     console.log(`Socket ${socket.id} left room ${roomId}`);
   });
 
@@ -41,6 +85,24 @@ io.on("connection", (socket) => {
     if (!data?.roomId) return;
 
     io.to(data.roomId).emit("receiveMessage", data);
+  });
+
+  socket.on("disconnecting", () => {
+    const activeRooms = Array.from(socket.rooms).filter((roomId) => roomId !== socket.id);
+
+    activeRooms.forEach((roomId) => {
+      const usersInRoom = roomUsers.get(roomId);
+      if (!usersInRoom) return;
+
+      usersInRoom.delete(socket.id);
+
+      if (usersInRoom.size === 0) {
+        roomUsers.delete(roomId);
+      }
+
+      const snapshot = emitRoomUsers(roomId);
+      io.to(roomId).emit("roomUsers", snapshot);
+    });
   });
 
   socket.on("disconnect", () => {

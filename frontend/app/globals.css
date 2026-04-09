@@ -246,6 +246,58 @@ button:disabled {
   gap: 8px;
 }
 
+.online-meta {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #eef6ef;
+  border: 1px solid #cde0d0;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: #28553a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #28b463;
+  box-shadow: 0 0 0 4px rgba(40, 180, 99, 0.15);
+}
+
+.online-users-wrap {
+  margin-top: 10px;
+}
+
+.online-users-label {
+  margin: 0 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #3d684a;
+}
+
+.online-users-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.online-user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #d0decf;
+  background: #f6fbf4;
+  color: #234730;
+  font-size: 13px;
+}
+
 @media (max-width: 768px) {
   .dashboard-page,
   .chat-page {

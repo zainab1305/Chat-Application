@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { socket } from "@/lib/socket";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -12,9 +12,11 @@ export default function ChatClient({ roomId }) {
   const [room, setRoom] = useState(null);
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
+  const [onlineUsers, setOnlineUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [sendError, setSendError] = useState("");
+  const endOfMessagesRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -69,13 +71,11 @@ export default function ChatClient({ roomId }) {
   }, [roomId]);
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !session?.user) return;
 
     if (!socket.connected) {
       socket.connect();
     }
-
-    socket.emit("joinRoom", { roomId });
 
     const onReceiveMessage = (data) => {
       if (data?.roomId !== roomId) return;
@@ -87,13 +87,37 @@ export default function ChatClient({ roomId }) {
       });
     };
 
+    const onRoomUsers = (payload) => {
+      if (payload?.roomId !== roomId) return;
+      setOnlineUsers(payload.users || []);
+    };
+
     socket.on("receiveMessage", onReceiveMessage);
+    socket.on("roomUsers", onRoomUsers);
+
+    socket.emit("joinRoom", {
+      roomId,
+      user: {
+        id: session.user.id || session.user.email,
+        name: session.user.name,
+        email: session.user.email,
+      },
+    }, (snapshot) => {
+      if (snapshot?.roomId === roomId) {
+        setOnlineUsers(snapshot.users || []);
+      }
+    });
 
     return () => {
       socket.emit("leaveRoom", { roomId });
       socket.off("receiveMessage", onReceiveMessage);
+      socket.off("roomUsers", onRoomUsers);
     };
-  }, [roomId]);
+  }, [roomId, session?.user]);
+
+  useEffect(() => {
+    endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const sendMessage = async () => {
     if (!session) return;
@@ -162,6 +186,10 @@ export default function ChatClient({ roomId }) {
             <p className="dashboard-kicker">Room</p>
             <h1>{room?.name}</h1>
             <p>Code: {room?.code}</p>
+            <div className="online-meta">
+              <span className="online-dot" />
+              <span>{onlineUsers.length} online</span>
+            </div>
           </div>
 
           <div className="chat-header-actions">
@@ -194,7 +222,21 @@ export default function ChatClient({ roomId }) {
               );
             })
           )}
+          <div ref={endOfMessagesRef} />
         </div>
+
+        {onlineUsers.length > 0 && (
+          <div className="online-users-wrap">
+            <p className="online-users-label">Active in this room</p>
+            <div className="online-users-list">
+              {onlineUsers.map((user) => (
+                <span key={`${user.id}-${user.email}`} className="online-user-pill">
+                  {user.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="composer">
           <input
