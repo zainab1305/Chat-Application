@@ -2,9 +2,10 @@
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { useState } from "react";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -24,7 +25,7 @@ export default function LoginPage() {
       email,
       password,
       redirect: false,
-      callbackUrl: "/chat",
+      callbackUrl: "/dashboard",
     });
 
     setLoading(false);
@@ -34,7 +35,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/chat");
+    router.push("/dashboard");
   };
 
   return (
@@ -89,7 +90,7 @@ export default function LoginPage() {
         </div>
 
         <button
-          onClick={() => signIn("google", { callbackUrl: "/chat" })}
+          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
           className="w-full bg-white border text-black px-6 py-2 rounded"
         >
           Sign in with Google
@@ -103,5 +104,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center px-4">Loading...</div>}>
+      <LoginContent />
+    </Suspense>
   );
 }

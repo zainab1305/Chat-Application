@@ -94,7 +94,7 @@ export default function RegisterPage() {
         </div>
 
         <button
-          onClick={() => signIn("google", { callbackUrl: "/chat" })}
+          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
           className="w-full bg-white border text-black px-6 py-2 rounded"
         >
           Continue with Google

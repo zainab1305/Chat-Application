@@ -20,11 +20,27 @@ io.on("connection", (socket) => {
 
   socket.emit("welcome", "Welcome to the server!");
 
+  socket.on("joinRoom", ({ roomId }) => {
+    if (!roomId) return;
+
+    socket.join(roomId);
+    socket.emit("roomJoined", { roomId });
+    console.log(`Socket ${socket.id} joined room ${roomId}`);
+  });
+
+  socket.on("leaveRoom", ({ roomId }) => {
+    if (!roomId) return;
+
+    socket.leave(roomId);
+    console.log(`Socket ${socket.id} left room ${roomId}`);
+  });
+
   socket.on("sendMessage", (data) => {
     console.log("Message received:", data);
 
-    // Send message to all users
-    io.emit("receiveMessage", data);
+    if (!data?.roomId) return;
+
+    io.to(data.roomId).emit("receiveMessage", data);
   });
 
   socket.on("disconnect", () => {
