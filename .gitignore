@@ -8,3 +8,5 @@ env.*
 /frontent-next/node_modules
 /frontent-next/dist
 /frontent-next/.next
+frontend/env.download
+frontend/.env.download
