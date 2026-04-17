@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { connectDB } from "@/lib/db";
-import User from "@/models/User";
 import Room from "@/models/Room";
+import { getUserFromSession, ROOM_ROLE } from "@/lib/roomRoles";
 
 function generateRoomCode(length = 6) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -14,12 +14,6 @@ function generateRoomCode(length = 6) {
   }
 
   return code;
-}
-
-async function getUserFromSession(session) {
-  if (!session?.user?.email) return null;
-
-  return User.findOne({ email: session.user.email.toLowerCase().trim() });
 }
 
 export async function GET() {
@@ -38,7 +32,9 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const rooms = await Room.find({ members: user._id })
+    const rooms = await Room.find({
+      $or: [{ "members.userId": user._id }, { members: user._id }],
+    })
       .sort({ updatedAt: -1 })
       .select("name code createdBy members updatedAt createdAt")
       .lean();
@@ -97,7 +93,14 @@ export async function POST(req) {
       name: name.trim(),
       code,
       createdBy: user._id,
-      members: [user._id],
+      members: [
+        {
+          userId: user._id,
+          role: ROOM_ROLE.ADMIN,
+          joinedAt: new Date(),
+          lastSeen: new Date(),
+        },
+      ],
     });
 
     return NextResponse.json({ room }, { status: 201 });

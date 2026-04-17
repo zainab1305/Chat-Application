@@ -18,6 +18,40 @@ Users can:
 - Send and receive messages in real time
 - See who is currently online in a room
 
+## Implemented Features
+
+The project now includes the following completed features:
+
+- Room workspace modules
+	- Tasks module with status updates, assignment, and role-based controls
+	- Resources module for links/files shared in a room
+	- Members module with role-aware member management
+- Room-scoped RBAC
+	- Member roles: admin, moderator, member
+	- Admin-only role updates
+	- Controlled member removal rules for admin/moderator
+- Chat enhancements
+	- Reply-to-message flow with quoted reply preview in composer and message bubble
+	- Pin/unpin messages for managers
+	- Delete message action for managers
+	- Right-click message action menu
+- Announcements
+	- Announcement posting by admin/moderator
+	- Separate in-room announcements panel showing announcement history
+	- Real-time announcement propagation
+- Unread and dashboard awareness
+	- Per-room unread message counts derived from lastSeen (not stored as counters)
+	- Room highlighting and unread badge in dashboard room cards
+	- lastSeen tracking per user per room
+	- Unread reset when opening a room
+- Dashboard notifications
+	- Bell icon with live notification feed
+	- Notifications for:
+		- member joined room
+		- member removed from room
+		- new announcement
+		- replies directed to the current user
+
 ## Tech Stack
 
 - Frontend: Next.js (App Router), React, NextAuth
@@ -118,7 +152,19 @@ Open http://localhost:3000
 - GET|POST /api/auth/[...nextauth]
 - GET|POST /api/rooms
 - POST /api/rooms/join
+- GET|PATCH|DELETE /api/rooms/:roomId
+- GET /api/rooms/:roomId/members
 - GET|POST /api/rooms/:roomId/messages
+- DELETE /api/rooms/:roomId/messages/:messageId
+- GET|POST /api/rooms/:roomId/tasks
+- PATCH|DELETE /api/rooms/:roomId/tasks/:taskId
+- GET|POST /api/rooms/:roomId/resources
+- POST /api/announcement
+- PATCH /api/message/pin
+- PATCH /api/room/promote
+- DELETE /api/room/remove-user
+- PATCH /api/room/last-seen
+- GET /api/room/unread
 
 ## Socket Events
 
@@ -129,6 +175,14 @@ Server URL: http://localhost:5000
 - sendMessage
 - receiveMessage
 - roomUsers
+- announcementCreated
+- messagePinned
+- messageDeleted
+- roleUpdated
+- userRemoved
+- newMessageNotification
+- dashboardNotification
+- memberJoinedNotification
 
 ## Available Scripts
 

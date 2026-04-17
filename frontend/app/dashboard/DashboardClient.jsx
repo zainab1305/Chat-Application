@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { socket } from "@/lib/socket";
 
 export default function DashboardClient() {
   const ROOM_CODE_LENGTH = 6;
@@ -15,11 +16,34 @@ export default function DashboardClient() {
   const [createRoomName, setCreateRoomName] = useState("");
   const [joinRoomCode, setJoinRoomCode] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+  const [unreadByRoom, setUnreadByRoom] = useState({});
+  const [totalUnread, setTotalUnread] = useState(0);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationItems, setNotificationItems] = useState([]);
+  const [notificationUnread, setNotificationUnread] = useState(0);
 
   const greetingName = useMemo(() => {
     if (!session?.user?.name) return session?.user?.email || "there";
     return session.user.name;
   }, [session]);
+
+  const currentUserToken = useMemo(
+    () => String(session?.user?.id || session?.user?.email || ""),
+    [session?.user?.id, session?.user?.email]
+  );
+
+  const roomNameById = useMemo(() => {
+    const next = {};
+    for (const room of rooms) {
+      next[room._id] = room.name;
+    }
+    return next;
+  }, [rooms]);
+
+  function addDashboardNotification(item) {
+    setNotificationItems((current) => [item, ...current].slice(0, 40));
+    setNotificationUnread((current) => current + 1);
+  }
 
   async function fetchRooms() {
     setLoading(true);
@@ -41,9 +65,151 @@ export default function DashboardClient() {
     }
   }
 
+  async function fetchUnread() {
+    try {
+      const response = await fetch("/api/room/unread", { cache: "no-store" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch unread counts");
+      }
+
+      const nextUnread = (data.unread || []).reduce((acc, item) => {
+        acc[item.roomId] = item.unreadCount || 0;
+        return acc;
+      }, {});
+
+      setUnreadByRoom(nextUnread);
+      setTotalUnread(data.totalUnread || 0);
+    } catch (err) {
+      setError(err.message || "Failed to fetch unread counts");
+    }
+  }
+
+  async function openRoom(roomId) {
+    try {
+      await fetch("/api/room/last-seen", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId }),
+      });
+    } catch {
+      // The room view will retry and sync lastSeen again on load.
+    }
+
+    setUnreadByRoom((current) => {
+      const deduction = current[roomId] || 0;
+      setTotalUnread((total) => Math.max(0, total - deduction));
+      return { ...current, [roomId]: 0 };
+    });
+    router.push(`/chat/${roomId}`);
+  }
+
   useEffect(() => {
-    fetchRooms();
+    Promise.all([fetchRooms(), fetchUnread()]);
   }, []);
+
+  useEffect(() => {
+    if (!session?.user) return;
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const onNewMessageNotification = (payload) => {
+      if (!payload?.roomId) return;
+
+      setUnreadByRoom((current) => {
+        if (!(payload.roomId in current) && !rooms.some((room) => room._id === payload.roomId)) {
+          return current;
+        }
+
+        const nextCount = (current[payload.roomId] || 0) + 1;
+        return { ...current, [payload.roomId]: nextCount };
+      });
+
+      if (rooms.some((room) => room._id === payload.roomId)) {
+        setTotalUnread((current) => current + 1);
+      }
+    };
+
+    const onDashboardNotification = (payload) => {
+      if (!payload?.type || !payload?.roomId) return;
+
+      const roomName = roomNameById[payload.roomId] || "a room";
+      const isKnownRoom = Boolean(roomNameById[payload.roomId]);
+
+      if (!isKnownRoom && String(payload?.targetUserId || "") !== currentUserToken) {
+        return;
+      }
+
+      if (payload.type === "reply") {
+        if (String(payload.targetUserId || "") !== currentUserToken) return;
+
+        addDashboardNotification({
+          id: `${payload.type}-${payload.messageId || Date.now()}`,
+          type: payload.type,
+          roomId: payload.roomId,
+          title: `${payload.actorName || "Someone"} replied to you`,
+          description: payload.preview || "Open room to view reply",
+          createdAt: payload.createdAt || new Date().toISOString(),
+        });
+        return;
+      }
+
+      if (payload.type === "announcement") {
+        if (!isKnownRoom) return;
+
+        addDashboardNotification({
+          id: `${payload.type}-${payload.messageId || Date.now()}`,
+          type: payload.type,
+          roomId: payload.roomId,
+          title: `Announcement in ${roomName}`,
+          description: payload.preview || "Open room to read",
+          createdAt: payload.createdAt || new Date().toISOString(),
+        });
+        return;
+      }
+
+      if (payload.type === "member-joined") {
+        if (!isKnownRoom) return;
+
+        addDashboardNotification({
+          id: `${payload.type}-${payload.actorUserId || Date.now()}`,
+          type: payload.type,
+          roomId: payload.roomId,
+          title: `${payload.actorName || "A member"} joined ${roomName}`,
+          description: "New member joined the room",
+          createdAt: payload.createdAt || new Date().toISOString(),
+        });
+        return;
+      }
+
+      if (payload.type === "member-removed") {
+        const isSelfTarget = String(payload?.targetUserId || "") === currentUserToken;
+        if (!isKnownRoom && !isSelfTarget) return;
+
+        addDashboardNotification({
+          id: `${payload.type}-${payload.targetUserId || Date.now()}`,
+          type: payload.type,
+          roomId: payload.roomId,
+          title: isSelfTarget
+            ? `You were removed from ${roomName}`
+            : `A member was removed from ${roomName}`,
+          description: `${payload.actorName || "Manager"} updated room members`,
+          createdAt: payload.createdAt || new Date().toISOString(),
+        });
+      }
+    };
+
+    socket.on("newMessageNotification", onNewMessageNotification);
+    socket.on("dashboardNotification", onDashboardNotification);
+
+    return () => {
+      socket.off("newMessageNotification", onNewMessageNotification);
+      socket.off("dashboardNotification", onDashboardNotification);
+    };
+  }, [rooms, roomNameById, session?.user, currentUserToken]);
 
   async function handleCreateRoom(e) {
     e.preventDefault();
@@ -64,8 +230,8 @@ export default function DashboardClient() {
       }
 
       setCreateRoomName("");
-      await fetchRooms();
-      router.push(`/chat/${data.room._id}`);
+      await Promise.all([fetchRooms(), fetchUnread()]);
+      openRoom(data.room._id);
     } catch (err) {
       setError(err.message || "Failed to create room");
     } finally {
@@ -92,8 +258,17 @@ export default function DashboardClient() {
       }
 
       setJoinRoomCode("");
-      await fetchRooms();
-      router.push(`/chat/${data.room._id}`);
+      await Promise.all([fetchRooms(), fetchUnread()]);
+
+      if (socket.connected) {
+        socket.emit("memberJoinedNotification", {
+          roomId: data.room._id,
+          userId: currentUserToken,
+          userName: session?.user?.name || session?.user?.email || "A member",
+        });
+      }
+
+      openRoom(data.room._id);
     } catch (err) {
       setError(err.message || "Failed to join room");
     } finally {
@@ -111,9 +286,61 @@ export default function DashboardClient() {
             <p>Pick a room, create one, or join with a room code.</p>
           </div>
 
-          <button className="ghost-btn" onClick={() => signOut({ callbackUrl: "/login" })}>
-            Logout
-          </button>
+          <div className="dashboard-head-actions">
+            <div className="dashboard-bell-wrap">
+              <button
+                className="ghost-btn dashboard-bell-btn"
+                onClick={() => {
+                  setNotificationOpen((open) => {
+                    const next = !open;
+                    if (next) {
+                      setNotificationUnread(0);
+                    }
+                    return next;
+                  });
+                }}
+                aria-label="Open notifications"
+              >
+                <span aria-hidden="true">🔔</span>
+                {notificationUnread > 0 && (
+                  <span className="dashboard-bell-badge">{notificationUnread}</span>
+                )}
+              </button>
+
+              {notificationOpen && (
+                <div className="dashboard-notification-popover">
+                  <div className="dashboard-notification-head">
+                    <h3>Notifications</h3>
+                  </div>
+
+                  {notificationItems.length === 0 ? (
+                    <p className="dashboard-notification-empty">No notifications yet.</p>
+                  ) : (
+                    <div className="dashboard-notification-list">
+                      {notificationItems.map((item) => (
+                        <button
+                          type="button"
+                          key={item.id}
+                          className="dashboard-notification-item"
+                          onClick={() => {
+                            setNotificationOpen(false);
+                            openRoom(item.roomId);
+                          }}
+                        >
+                          <strong>{item.title}</strong>
+                          <p>{item.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button className="ghost-btn" onClick={() => signOut({ callbackUrl: "/login" })}>
+              Logout
+            </button>
+          </div>
         </header>
 
         {error && <div className="error-banner">{error}</div>}
@@ -188,14 +415,19 @@ export default function DashboardClient() {
               {rooms.map((room) => (
                 <button
                   key={room._id}
-                  className="room-item"
-                  onClick={() => router.push(`/chat/${room._id}`)}
+                  className={`room-item ${(unreadByRoom[room._id] || 0) > 0 ? "room-item-unread" : ""}`}
+                  onClick={() => openRoom(room._id)}
                 >
                   <div>
                     <h3>{room.name}</h3>
                     <p>Code: {room.code}</p>
                   </div>
-                  <span>Open</span>
+                  <div className="room-item-side">
+                    {(unreadByRoom[room._id] || 0) > 0 && (
+                      <span className="room-unread-badge">{unreadByRoom[room._id]}</span>
+                    )}
+                    <span>Open</span>
+                  </div>
                 </button>
               ))}
             </div>

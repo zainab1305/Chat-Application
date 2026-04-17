@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { connectDB } from "@/lib/db";
 import User from "@/models/User";
 import Room from "@/models/Room";
+import { ROOM_ROLE, normalizeLegacyRoomMembers } from "@/lib/roomRoles";
 
 const ROOM_CODE_LENGTH = 6;
 const ROOM_CODE_REGEX = new RegExp(`^[A-Z0-9]{${ROOM_CODE_LENGTH}}$`);
@@ -49,13 +50,25 @@ export async function POST(req) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
     }
 
+    await normalizeLegacyRoomMembers(room);
+
     const alreadyMember = room.members.some(
-      (memberId) => memberId.toString() === user._id.toString()
+      (member) => member?.userId?.toString?.() === user._id.toString()
     );
 
     if (!alreadyMember) {
-      room.members.push(user._id);
+      room.members.push({
+        userId: user._id,
+        role: ROOM_ROLE.MEMBER,
+        joinedAt: new Date(),
+        lastSeen: new Date(),
+      });
       await room.save();
+    } else {
+      await Room.updateOne(
+        { _id: room._id, "members.userId": user._id },
+        { $set: { "members.$.lastSeen": new Date() } }
+      );
     }
 
     return NextResponse.json({ room }, { status: 200 });

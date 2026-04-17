@@ -85,6 +85,96 @@ io.on("connection", (socket) => {
     if (!data?.roomId) return;
 
     io.to(data.roomId).emit("receiveMessage", data);
+    io.emit("newMessageNotification", {
+      roomId: data.roomId,
+      messageId: data._id || null,
+    });
+
+    if (
+      data?.replyTo?.userId
+      && String(data.replyTo.userId) !== String(data.senderId || "")
+    ) {
+      io.emit("dashboardNotification", {
+        type: "reply",
+        roomId: data.roomId,
+        messageId: data._id || null,
+        actorName: data.senderName || "Someone",
+        targetUserId: String(data.replyTo.userId),
+        preview: data.message || "",
+        createdAt: new Date().toISOString(),
+      });
+    }
+  });
+
+  socket.on("announcementCreated", (data) => {
+    if (!data?.roomId) return;
+
+    io.to(data.roomId).emit("announcementCreated", data);
+    io.to(data.roomId).emit("receiveMessage", data);
+    io.emit("newMessageNotification", {
+      roomId: data.roomId,
+      messageId: data._id || null,
+    });
+
+    io.emit("dashboardNotification", {
+      type: "announcement",
+      roomId: data.roomId,
+      messageId: data._id || null,
+      actorName: data.senderName || "Moderator",
+      preview: data.message || "",
+      createdAt: new Date().toISOString(),
+    });
+  });
+
+  socket.on("memberJoinedNotification", (payload) => {
+    if (!payload?.roomId || !payload?.userId) return;
+
+    io.emit("dashboardNotification", {
+      type: "member-joined",
+      roomId: payload.roomId,
+      actorName: payload.userName || "A member",
+      actorUserId: String(payload.userId),
+      createdAt: new Date().toISOString(),
+    });
+  });
+
+  socket.on("messagePinned", (data) => {
+    if (!data?.roomId || !data?.message?._id) return;
+
+    io.to(data.roomId).emit("messagePinned", data);
+  });
+
+  socket.on("messageDeleted", (data) => {
+    if (!data?.roomId || !data?.messageId) return;
+
+    io.to(data.roomId).emit("messageDeleted", data);
+  });
+
+  socket.on("roleUpdated", (payload) => {
+    if (!payload?.roomId || !payload?.targetUserId) return;
+
+    io.to(payload.roomId).emit("roleUpdated", {
+      roomId: payload.roomId,
+      targetUserId: payload.targetUserId,
+      role: payload.role || "moderator",
+    });
+  });
+
+  socket.on("userRemoved", (payload) => {
+    if (!payload?.roomId || !payload?.targetUserId) return;
+
+    io.to(payload.roomId).emit("userRemoved", {
+      roomId: payload.roomId,
+      targetUserId: payload.targetUserId,
+    });
+
+    io.emit("dashboardNotification", {
+      type: "member-removed",
+      roomId: payload.roomId,
+      targetUserId: payload.targetUserId,
+      actorName: payload.actorName || "Manager",
+      createdAt: new Date().toISOString(),
+    });
   });
 
   socket.on("disconnecting", () => {

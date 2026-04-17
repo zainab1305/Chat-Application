@@ -2,34 +2,12 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { connectDB } from "@/lib/db";
-import User from "@/models/User";
 import Room from "@/models/Room";
 import Message from "@/models/Message";
+import { getRoomAccess } from "@/lib/roomRoles";
 
 async function getUserAndRoom(session, roomId) {
-  const user = await User.findOne({
-    email: session.user.email.toLowerCase().trim(),
-  });
-
-  if (!user) {
-    return { error: "User not found", status: 404 };
-  }
-
-  const room = await Room.findById(roomId);
-
-  if (!room) {
-    return { error: "Room not found", status: 404 };
-  }
-
-  const isMember = room.members.some(
-    (memberId) => memberId.toString() === user._id.toString()
-  );
-
-  if (!isMember) {
-    return { error: "You are not a member of this room", status: 403 };
-  }
-
-  return { user, room };
+  return getRoomAccess(session, roomId);
 }
 
 export async function GET(_, { params }) {
@@ -40,8 +18,6 @@ export async function GET(_, { params }) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await connectDB();
-
     const { roomId } = await params;
     const access = await getUserAndRoom(session, roomId);
 
@@ -51,7 +27,7 @@ export async function GET(_, { params }) {
 
     const messages = await Message.find({ roomId })
       .sort({ createdAt: 1 })
-      .select("senderId senderName message time createdAt")
+      .select("senderId senderName message type isPinned pinnedAt replyTo time createdAt")
       .lean();
 
     return NextResponse.json({ messages }, { status: 200 });
@@ -68,7 +44,7 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { message } = await req.json();
+    const { message, replyTo } = await req.json();
 
     if (!message || !message.trim()) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
@@ -85,17 +61,39 @@ export async function POST(req, { params }) {
 
     const now = new Date();
 
+    const normalizedReply =
+      replyTo && typeof replyTo === "object"
+        ? {
+            messageId: replyTo.messageId || null,
+            userId: String(replyTo.userId || "").trim(),
+            senderName: String(replyTo.senderName || "").trim().slice(0, 120),
+            message: String(replyTo.message || "").trim().slice(0, 300),
+          }
+        : null;
+
     const created = await Message.create({
       roomId,
       senderId: access.user._id,
       senderName: access.user.name || access.user.email,
       message: message.trim(),
+      type: "message",
+      isPinned: false,
+      pinnedAt: null,
+      replyTo:
+        normalizedReply && normalizedReply.senderName && normalizedReply.message
+          ? normalizedReply
+          : undefined,
       time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     });
 
     await Room.findByIdAndUpdate(roomId, { $set: { updatedAt: now } });
 
-    return NextResponse.json({ message: created }, { status: 201 });
+    const createdMessage = created.toObject ? created.toObject() : created;
+    if (normalizedReply && normalizedReply.senderName && normalizedReply.message) {
+      createdMessage.replyTo = normalizedReply;
+    }
+
+    return NextResponse.json({ message: createdMessage }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
