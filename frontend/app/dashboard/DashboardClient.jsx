@@ -21,6 +21,8 @@ export default function DashboardClient() {
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationItems, setNotificationItems] = useState([]);
   const [notificationUnread, setNotificationUnread] = useState(0);
+  const [roomInsights, setRoomInsights] = useState({});
+  const [insightsLoading, setInsightsLoading] = useState(false);
 
   const greetingName = useMemo(() => {
     if (!session?.user?.name) return session?.user?.email || "there";
@@ -39,6 +41,26 @@ export default function DashboardClient() {
     }
     return next;
   }, [rooms]);
+
+  const recentRooms = useMemo(() => rooms.slice(0, 4), [rooms]);
+
+  const stats = useMemo(() => {
+    const roomsJoined = rooms.length;
+    const tasksPending = rooms.reduce(
+      (total, room) => total + (roomInsights[room._id]?.pendingTasks || 0),
+      0
+    );
+    const filesShared = rooms.reduce(
+      (total, room) => total + (roomInsights[room._id]?.filesShared || 0),
+      0
+    );
+
+    return {
+      roomsJoined,
+      tasksPending,
+      filesShared,
+    };
+  }, [rooms, roomInsights]);
 
   function addDashboardNotification(item) {
     setNotificationItems((current) => [item, ...current].slice(0, 40));
@@ -86,6 +108,66 @@ export default function DashboardClient() {
     }
   }
 
+  async function fetchRoomInsights(targetRooms) {
+    if (!targetRooms.length) {
+      setRoomInsights({});
+      return;
+    }
+
+    setInsightsLoading(true);
+
+    try {
+      const entries = await Promise.all(
+        targetRooms.map(async (room) => {
+          try {
+            const [messagesRes, tasksRes, resourcesRes] = await Promise.all([
+              fetch(`/api/rooms/${room._id}/messages`, { cache: "no-store" }),
+              fetch(`/api/rooms/${room._id}/tasks`, { cache: "no-store" }),
+              fetch(`/api/rooms/${room._id}/resources`, { cache: "no-store" }),
+            ]);
+
+            const [messagesData, tasksData, resourcesData] = await Promise.all([
+              messagesRes.json(),
+              tasksRes.json(),
+              resourcesRes.json(),
+            ]);
+
+            const messages = Array.isArray(messagesData?.messages) ? messagesData.messages : [];
+            const tasks = Array.isArray(tasksData?.tasks) ? tasksData.tasks : [];
+            const resources = Array.isArray(resourcesData?.resources) ? resourcesData.resources : [];
+
+            const previewMessage =
+              messages.length > 0
+                ? String(messages[messages.length - 1]?.message || "No messages yet")
+                : "No messages yet";
+
+            return [
+              room._id,
+              {
+                previewMessage,
+                pendingTasks: tasks.filter((task) => task.status !== "done").length,
+                filesShared: resources.length,
+              },
+            ];
+          } catch {
+            return [
+              room._id,
+              {
+                previewMessage: "No messages yet",
+                pendingTasks: 0,
+                filesShared: 0,
+              },
+            ];
+          }
+        })
+      );
+
+      setRoomInsights(Object.fromEntries(entries));
+    } finally {
+      setInsightsLoading(false);
+    }
+  }
+
   async function openRoom(roomId) {
     try {
       await fetch("/api/room/last-seen", {
@@ -108,6 +190,10 @@ export default function DashboardClient() {
   useEffect(() => {
     Promise.all([fetchRooms(), fetchUnread()]);
   }, []);
+
+  useEffect(() => {
+    fetchRoomInsights(rooms);
+  }, [rooms]);
 
   useEffect(() => {
     if (!session?.user) return;
@@ -283,7 +369,10 @@ export default function DashboardClient() {
           <div>
             <p className="dashboard-kicker">Workspace</p>
             <h1>Welcome, {greetingName}</h1>
-            <p>Pick a room, create one, or join with a room code.</p>
+            <p>Pick a room to start collaborating.</p>
+            {totalUnread > 0 ? (
+              <p className="dashboard-unread-indicator">{totalUnread} unread updates across rooms</p>
+            ) : null}
           </div>
 
           <div className="dashboard-head-actions">
@@ -345,7 +434,7 @@ export default function DashboardClient() {
 
         {error && <div className="error-banner">{error}</div>}
 
-        <section className="dashboard-grid">
+        <section className="dashboard-grid dashboard-quick-actions">
           <article className="card">
             <h2>Create Room</h2>
             <p>Start a fresh collaboration space for your team.</p>
@@ -398,9 +487,26 @@ export default function DashboardClient() {
           </article>
         </section>
 
+        <section className="dashboard-stats">
+          <article className="dashboard-stat-card">
+            <p>Rooms joined</p>
+            <strong>{stats.roomsJoined}</strong>
+          </article>
+
+          <article className="dashboard-stat-card">
+            <p>Tasks pending</p>
+            <strong>{stats.tasksPending}</strong>
+          </article>
+
+          <article className="dashboard-stat-card">
+            <p>Files shared</p>
+            <strong>{stats.filesShared}</strong>
+          </article>
+        </section>
+
         <section className="room-list card">
           <div className="room-list-head">
-            <h2>Your Rooms</h2>
+            <h2>Recent Rooms</h2>
             <button className="ghost-btn" onClick={fetchRooms}>
               Refresh
             </button>
@@ -411,25 +517,31 @@ export default function DashboardClient() {
           ) : rooms.length === 0 ? (
             <p>No rooms yet. Create one or join with a code.</p>
           ) : (
-            <div className="rooms">
-              {rooms.map((room) => (
-                <button
-                  key={room._id}
-                  className={`room-item ${(unreadByRoom[room._id] || 0) > 0 ? "room-item-unread" : ""}`}
-                  onClick={() => openRoom(room._id)}
-                >
-                  <div>
-                    <h3>{room.name}</h3>
-                    <p>Code: {room.code}</p>
-                  </div>
-                  <div className="room-item-side">
-                    {(unreadByRoom[room._id] || 0) > 0 && (
-                      <span className="room-unread-badge">{unreadByRoom[room._id]}</span>
-                    )}
-                    <span>Open</span>
-                  </div>
-                </button>
-              ))}
+            <div className="recent-rooms-grid">
+              {recentRooms.map((room) => {
+                const unread = unreadByRoom[room._id] || 0;
+                const insight = roomInsights[room._id];
+
+                return (
+                  <article key={room._id} className="recent-room-card">
+                    <div className="recent-room-head">
+                      <h3>{room.name}</h3>
+                      {unread > 0 ? <span className="room-unread-badge">{unread}</span> : null}
+                    </div>
+
+                    <p className="recent-room-code">Code: {room.code}</p>
+                    <p className="recent-room-preview">
+                      {insightsLoading
+                        ? "Loading latest message..."
+                        : insight?.previewMessage || "No messages yet"}
+                    </p>
+
+                    <button className="primary-btn recent-room-open" onClick={() => openRoom(room._id)}>
+                      Open
+                    </button>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>
