@@ -5,6 +5,7 @@ import { connectDB } from "@/lib/db";
 import Room from "@/models/Room";
 import Message from "@/models/Message";
 import { getRoomAccess } from "@/lib/roomRoles";
+import { buildNotificationLink, createRoomNotifications } from "@/lib/notifications";
 
 export async function POST(req) {
   try {
@@ -52,6 +53,16 @@ export async function POST(req) {
     });
 
     await Room.findByIdAndUpdate(roomId, { $set: { updatedAt: now } });
+
+    await createRoomNotifications({
+      room: access.room,
+      sender: access.user,
+      actionType: "announcement",
+      entityType: "announcement",
+      entityId: created._id,
+      previewText: created.message,
+      link: buildNotificationLink(roomId, "announcement"),
+    });
 
     return NextResponse.json({ message: created }, { status: 201 });
   } catch (error) {

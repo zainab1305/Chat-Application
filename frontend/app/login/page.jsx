@@ -69,7 +69,7 @@ function LoginContent() {
 
       <section className="login-stage">
         <div className="login-showcase">
-          <p className="dashboard-kicker">Workspace</p>
+          <p className="dashboard-kicker">WorkspaceOne</p>
           <h1 className="login-stage-title">Sign in and step back into your rooms.</h1>
           <p className="login-stage-copy">
             Messages, tasks, resources, and unread updates stay in one place so work picks up where you left it.

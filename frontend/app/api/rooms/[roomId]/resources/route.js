@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { connectDB } from "@/lib/db";
 import Resource from "@/models/Resource";
 import { getRoomAccess } from "@/lib/roomRoles";
+import { buildNotificationLink, createRoomNotifications } from "@/lib/notifications";
 
 export async function GET(_, { params }) {
   try {
@@ -45,6 +47,8 @@ export async function POST(req, { params }) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
+    await connectDB();
+
     const { type, url, name } = await req.json();
 
     if (!type || !url) {
@@ -62,6 +66,18 @@ export async function POST(req, { params }) {
     const createdResource = await Resource.findById(resource._id)
       .populate("uploadedBy", "name email")
       .lean();
+
+    if (type === "file") {
+      await createRoomNotifications({
+        room: access.room,
+        sender: access.user,
+        actionType: "file",
+        entityType: "resource",
+        entityId: resource._id,
+        previewText: name?.trim() || "Uploaded a file",
+        link: buildNotificationLink(roomId, "file"),
+      });
+    }
 
     return NextResponse.json({ resource: createdResource }, { status: 201 });
   } catch (error) {

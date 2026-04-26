@@ -1,5 +1,6 @@
 import "./globals.css";
 import AuthProvider from "@/providers/AuthProvider";
+import { NotificationProvider } from "@/providers/NotificationProvider";
 import { Space_Grotesk } from "next/font/google";
 
 const spaceGrotesk = Space_Grotesk({
@@ -17,7 +18,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={spaceGrotesk.variable}>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <NotificationProvider>{children}</NotificationProvider>
+        </AuthProvider>
       </body>
     </html>
   );

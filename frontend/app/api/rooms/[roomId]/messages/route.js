@@ -5,6 +5,7 @@ import { connectDB } from "@/lib/db";
 import Room from "@/models/Room";
 import Message from "@/models/Message";
 import { getRoomAccess } from "@/lib/roomRoles";
+import { buildNotificationLink, createRoomNotifications } from "@/lib/notifications";
 
 async function getUserAndRoom(session, roomId) {
   return getRoomAccess(session, roomId);
@@ -92,6 +93,16 @@ export async function POST(req, { params }) {
     if (normalizedReply && normalizedReply.senderName && normalizedReply.message) {
       createdMessage.replyTo = normalizedReply;
     }
+
+    await createRoomNotifications({
+      room: access.room,
+      sender: access.user,
+      actionType: "message",
+      entityType: "message",
+      entityId: created._id,
+      previewText: created.message,
+      link: buildNotificationLink(roomId, "message"),
+    });
 
     return NextResponse.json({ message: createdMessage }, { status: 201 });
   } catch (error) {

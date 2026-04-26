@@ -4,6 +4,11 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { connectDB } from "@/lib/db";
 import Task from "@/models/Task";
 import { getRoomAccess } from "@/lib/roomRoles";
+import {
+  buildNotificationLink,
+  buildTaskNotificationPreview,
+  createRoomNotifications,
+} from "@/lib/notifications";
 
 export async function GET(_, { params }) {
   try {
@@ -115,6 +120,16 @@ export async function POST(req, { params }) {
       .populate("assignedTo", "name email")
       .populate("createdBy", "name email")
       .lean();
+
+    await createRoomNotifications({
+      room: access.room,
+      sender: access.user,
+      actionType: "task",
+      entityType: "task",
+      entityId: task._id,
+      previewText: buildTaskNotificationPreview(null, createdTask),
+      link: buildNotificationLink(roomId, "task"),
+    });
 
     return NextResponse.json({ task: createdTask }, { status: 201 });
   } catch (error) {

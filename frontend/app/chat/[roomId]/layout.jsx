@@ -3,6 +3,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import RoomNav from "./RoomNav";
 import RoomActions from "./RoomActions";
+import RoomPresence from "./RoomPresence";
 import { getRoomAccess } from "@/lib/roomRoles";
 
 export default async function RoomLayout({ children, params }) {
@@ -25,6 +26,7 @@ export default async function RoomLayout({ children, params }) {
 
   return (
     <div className="chat-page">
+      <RoomPresence roomId={roomId} />
       <div className="chat-shell room-shell">
         <div className="chat-header room-header">
           <div className="room-header-copy">

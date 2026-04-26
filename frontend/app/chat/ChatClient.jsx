@@ -178,21 +178,24 @@ export default function ChatClient({ roomId, roomCode }) {
     socket.on("messagePinned", onMessagePinned);
     socket.on("messageDeleted", onMessageDeleted);
 
-    socket.emit("joinRoom", {
-      roomId,
-      user: {
-        id: session.user.id || session.user.email,
-        name: session.user.name,
-        email: session.user.email,
+    socket.emit(
+      "joinRoom",
+      {
+        roomId,
+        user: {
+          id: session.user.id || session.user.email,
+          name: session.user.name,
+          email: session.user.email,
+        },
       },
-    }, (snapshot) => {
-      if (snapshot?.roomId === roomId) {
-        setOnlineUsers(snapshot.users || []);
+      (snapshot) => {
+        if (snapshot?.roomId === roomId) {
+          setOnlineUsers(snapshot.users || []);
+        }
       }
-    });
+    );
 
     return () => {
-      socket.emit("leaveRoom", { roomId });
       socket.off("receiveMessage", onReceiveMessage);
       socket.off("roomUsers", onRoomUsers);
       socket.off("announcementCreated", onAnnouncementCreated);
@@ -205,7 +208,7 @@ export default function ChatClient({ roomId, roomCode }) {
     if (!isNearBottom) return;
 
     endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages]);
+  }, [isNearBottom, messages]);
 
   useEffect(() => {
     const board = messageBoardRef.current;
@@ -664,12 +667,6 @@ export default function ChatClient({ roomId, roomCode }) {
           )}
 
           <div className="chat-input-row">
-            <button type="button" className="ghost-btn chat-mini-icon" aria-label="Emoji picker">
-              😊
-            </button>
-            <button type="button" className="ghost-btn chat-mini-icon" aria-label="Attach file">
-              📎
-            </button>
             <input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -806,6 +803,12 @@ export default function ChatClient({ roomId, roomCode }) {
           )}
         </div>
       )}
+
+      {toast ? (
+        <div className={`app-toast ${toast.type === "error" ? "app-toast-error" : "app-toast-success"}`} role="status">
+          {toast.message}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import NotificationBell from "@/components/NotificationBell";
 
 export default function RoomActions({ roomId, roomCode, isOwner }) {
   const router = useRouter();
@@ -70,6 +71,7 @@ export default function RoomActions({ roomId, roomCode, isOwner }) {
 
   return (
     <div className="chat-header-actions room-header-actions">
+      <NotificationBell />
       <button type="button" className="ghost-btn room-icon-btn" onClick={copyRoomCode}>
         {copiedCode ? "Copied" : "Copy Code"}
       </button>

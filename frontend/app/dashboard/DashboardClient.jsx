@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import NotificationBell from "@/components/NotificationBell";
 import { socket } from "@/lib/socket";
 
 export default function DashboardClient() {
@@ -19,9 +20,6 @@ export default function DashboardClient() {
   const [actionLoading, setActionLoading] = useState(false);
   const [unreadByRoom, setUnreadByRoom] = useState({});
   const [totalUnread, setTotalUnread] = useState(0);
-  const [notificationOpen, setNotificationOpen] = useState(false);
-  const [notificationItems, setNotificationItems] = useState([]);
-  const [notificationUnread, setNotificationUnread] = useState(0);
   const [roomInsights, setRoomInsights] = useState({});
   const [insightsLoading, setInsightsLoading] = useState(false);
 
@@ -35,19 +33,6 @@ export default function DashboardClient() {
     if (!session?.user?.name) return session?.user?.email || "there";
     return session.user.name;
   }, [session]);
-
-  const currentUserToken = useMemo(
-    () => String(session?.user?.id || session?.user?.email || ""),
-    [session?.user?.id, session?.user?.email]
-  );
-
-  const roomNameById = useMemo(() => {
-    const next = {};
-    for (const room of rooms) {
-      next[room._id] = room.name;
-    }
-    return next;
-  }, [rooms]);
 
   const recentRooms = useMemo(() => rooms.slice(0, 4), [rooms]);
 
@@ -68,11 +53,6 @@ export default function DashboardClient() {
       filesShared,
     };
   }, [rooms, roomInsights]);
-
-  function addDashboardNotification(item) {
-    setNotificationItems((current) => [item, ...current].slice(0, 40));
-    setNotificationUnread((current) => current + 1);
-  }
 
   async function fetchRooms() {
     setLoading(true);
@@ -226,8 +206,7 @@ export default function DashboardClient() {
           return current;
         }
 
-        const nextCount = (current[payload.roomId] || 0) + 1;
-        return { ...current, [payload.roomId]: nextCount };
+        return { ...current, [payload.roomId]: (current[payload.roomId] || 0) + 1 };
       });
 
       if (rooms.some((room) => room._id === payload.roomId)) {
@@ -235,83 +214,12 @@ export default function DashboardClient() {
       }
     };
 
-    const onDashboardNotification = (payload) => {
-      if (!payload?.type || !payload?.roomId) return;
-
-      const roomName = roomNameById[payload.roomId] || "a room";
-      const isKnownRoom = Boolean(roomNameById[payload.roomId]);
-
-      if (!isKnownRoom && String(payload?.targetUserId || "") !== currentUserToken) {
-        return;
-      }
-
-      if (payload.type === "reply") {
-        if (String(payload.targetUserId || "") !== currentUserToken) return;
-
-        addDashboardNotification({
-          id: `${payload.type}-${payload.messageId || Date.now()}`,
-          type: payload.type,
-          roomId: payload.roomId,
-          title: `${payload.actorName || "Someone"} replied to you`,
-          description: payload.preview || "Open room to view reply",
-          createdAt: payload.createdAt || new Date().toISOString(),
-        });
-        return;
-      }
-
-      if (payload.type === "announcement") {
-        if (!isKnownRoom) return;
-
-        addDashboardNotification({
-          id: `${payload.type}-${payload.messageId || Date.now()}`,
-          type: payload.type,
-          roomId: payload.roomId,
-          title: `Announcement in ${roomName}`,
-          description: payload.preview || "Open room to read",
-          createdAt: payload.createdAt || new Date().toISOString(),
-        });
-        return;
-      }
-
-      if (payload.type === "member-joined") {
-        if (!isKnownRoom) return;
-
-        addDashboardNotification({
-          id: `${payload.type}-${payload.actorUserId || Date.now()}`,
-          type: payload.type,
-          roomId: payload.roomId,
-          title: `${payload.actorName || "A member"} joined ${roomName}`,
-          description: "New member joined the room",
-          createdAt: payload.createdAt || new Date().toISOString(),
-        });
-        return;
-      }
-
-      if (payload.type === "member-removed") {
-        const isSelfTarget = String(payload?.targetUserId || "") === currentUserToken;
-        if (!isKnownRoom && !isSelfTarget) return;
-
-        addDashboardNotification({
-          id: `${payload.type}-${payload.targetUserId || Date.now()}`,
-          type: payload.type,
-          roomId: payload.roomId,
-          title: isSelfTarget
-            ? `You were removed from ${roomName}`
-            : `A member was removed from ${roomName}`,
-          description: `${payload.actorName || "Manager"} updated room members`,
-          createdAt: payload.createdAt || new Date().toISOString(),
-        });
-      }
-    };
-
     socket.on("newMessageNotification", onNewMessageNotification);
-    socket.on("dashboardNotification", onDashboardNotification);
 
     return () => {
       socket.off("newMessageNotification", onNewMessageNotification);
-      socket.off("dashboardNotification", onDashboardNotification);
     };
-  }, [rooms, roomNameById, session?.user, currentUserToken]);
+  }, [rooms, session?.user]);
 
   async function handleCreateRoom(e) {
     e.preventDefault();
@@ -361,15 +269,6 @@ export default function DashboardClient() {
 
       setJoinRoomCode("");
       await Promise.all([fetchRooms(), fetchUnread()]);
-
-      if (socket.connected) {
-        socket.emit("memberJoinedNotification", {
-          roomId: data.room._id,
-          userId: currentUserToken,
-          userName: session?.user?.name || session?.user?.email || "A member",
-        });
-      }
-
       openRoom(data.room._id, { toastMessage: "Joined room successfully" });
     } catch (err) {
       setError(err.message || "Failed to join room");
@@ -392,55 +291,7 @@ export default function DashboardClient() {
           </div>
 
           <div className="dashboard-head-actions">
-            <div className="dashboard-bell-wrap">
-              <button
-                className="ghost-btn dashboard-bell-btn"
-                onClick={() => {
-                  setNotificationOpen((open) => {
-                    const next = !open;
-                    if (next) {
-                      setNotificationUnread(0);
-                    }
-                    return next;
-                  });
-                }}
-                aria-label="Open notifications"
-              >
-                <span aria-hidden="true">🔔</span>
-                {notificationUnread > 0 && (
-                  <span className="dashboard-bell-badge">{notificationUnread}</span>
-                )}
-              </button>
-
-              {notificationOpen && (
-                <div className="dashboard-notification-popover">
-                  <div className="dashboard-notification-head">
-                    <h3>Notifications</h3>
-                  </div>
-
-                  {notificationItems.length === 0 ? (
-                    <p className="dashboard-notification-empty">No notifications yet.</p>
-                  ) : (
-                    <div className="dashboard-notification-list">
-                      {notificationItems.map((item) => (
-                        <button
-                          type="button"
-                          key={item.id}
-                          className="dashboard-notification-item"
-                          onClick={() => {
-                            setNotificationOpen(false);
-                            openRoom(item.roomId);
-                          }}
-                        >
-                          <strong>{item.title}</strong>
-                          <p>{item.description}</p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <NotificationBell />
 
             <button className="ghost-btn" onClick={() => signOut({ callbackUrl: "/login" })}>
               Logout

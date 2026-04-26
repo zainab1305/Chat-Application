@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { connectDB } from "@/lib/db";
 import Task from "@/models/Task";
 import { getRoomAccess } from "@/lib/roomRoles";
+import {
+  buildNotificationLink,
+  buildTaskNotificationPreview,
+  createRoomNotifications,
+  isMeaningfulTaskUpdate,
+} from "@/lib/notifications";
 
 export async function PATCH(req, { params }) {
   try {
@@ -19,6 +26,8 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
+    await connectDB();
+
     const task = await Task.findOne({ _id: taskId, roomId });
 
     if (!task) {
@@ -29,6 +38,14 @@ export async function PATCH(req, { params }) {
 
     const assigneeId = task.assignedTo ? task.assignedTo.toString() : null;
     const isAssignee = assigneeId === access.user._id.toString();
+    const beforeTask = {
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      dueDate: task.dueDate,
+      assignedTo: task.assignedTo ? task.assignedTo.toString() : null,
+    };
 
     const allowedPriorities = ["low", "med", "high"];
     const nextPriority = priority === undefined ? undefined : priority;
@@ -107,6 +124,31 @@ export async function PATCH(req, { params }) {
       .populate("assignedTo", "name email")
       .populate("createdBy", "name email")
       .lean();
+
+    const afterTask = {
+      title: updatedTask.title,
+      description: updatedTask.description,
+      status: updatedTask.status,
+      priority: updatedTask.priority,
+      dueDate: updatedTask.dueDate,
+      assignedTo: updatedTask.assignedTo?._id
+        ? updatedTask.assignedTo._id.toString()
+        : updatedTask.assignedTo
+          ? updatedTask.assignedTo.toString()
+          : null,
+    };
+
+    if (isMeaningfulTaskUpdate(beforeTask, afterTask)) {
+      await createRoomNotifications({
+        room: access.room,
+        sender: access.user,
+        actionType: "task",
+        entityType: "task",
+        entityId: task._id,
+        previewText: buildTaskNotificationPreview(beforeTask, afterTask),
+        link: buildNotificationLink(roomId, "task"),
+      });
+    }
 
     return NextResponse.json({ task: updatedTask }, { status: 200 });
   } catch (error) {
