@@ -23,7 +23,9 @@ export default function ChatClient({ roomId, roomCode }) {
   const [pinnedPreviewOpen, setPinnedPreviewOpen] = useState(true);
   const [pinnedDrawerOpen, setPinnedDrawerOpen] = useState(false);
   const [copiedInviteCode, setCopiedInviteCode] = useState(false);
+  const [isNearBottom, setIsNearBottom] = useState(true);
   const endOfMessagesRef = useRef(null);
+  const messageBoardRef = useRef(null);
 
   const pinnedMessages = useMemo(() => {
     return [...messages]
@@ -193,8 +195,27 @@ export default function ChatClient({ roomId, roomCode }) {
   }, [roomId, session?.user]);
 
   useEffect(() => {
-    endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!isNearBottom) return;
+
+    endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
+
+  useEffect(() => {
+    const board = messageBoardRef.current;
+    if (!board) return undefined;
+
+    const threshold = 84;
+
+    const updatePosition = () => {
+      const distanceFromBottom = board.scrollHeight - board.scrollTop - board.clientHeight;
+      setIsNearBottom(distanceFromBottom <= threshold);
+    };
+
+    updatePosition();
+    board.addEventListener("scroll", updatePosition, { passive: true });
+
+    return () => board.removeEventListener("scroll", updatePosition);
+  }, []);
 
   const markRoomAsSeen = useCallback(async () => {
     if (!session?.user || !roomId) return;
@@ -411,7 +432,34 @@ export default function ChatClient({ roomId, roomCode }) {
   };
 
   if (loading) {
-    return <p>Loading room...</p>;
+    return (
+      <div className="room-chat-layout chat-loading-layout" aria-label="Loading room">
+        <section className="room-chat-main">
+          <div className="chat-loading-stack">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="chat-skeleton-message">
+                <div className="skeleton-line skeleton-line-title" />
+                <div className="skeleton-line skeleton-line-text" />
+                <div className="skeleton-line skeleton-line-text short" />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <aside className="chat-context-sidebar">
+          <div className="chat-context-card chat-skeleton-card">
+            <div className="skeleton-line skeleton-line-title" />
+            <div className="skeleton-line skeleton-line-text" />
+            <div className="skeleton-line skeleton-line-button" />
+          </div>
+          <div className="chat-context-card chat-skeleton-card">
+            <div className="skeleton-line skeleton-line-title" />
+            <div className="skeleton-line skeleton-line-text" />
+            <div className="skeleton-line skeleton-line-button" />
+          </div>
+        </aside>
+      </div>
+    );
   }
 
   if (loadError) {
@@ -535,7 +583,7 @@ export default function ChatClient({ roomId, roomCode }) {
           </section>
         )}
 
-        <div className="message-board chat-message-board">
+        <div className="message-board chat-message-board" ref={messageBoardRef}>
           {messages.length === 0 ? (
             <p className="message-empty">No messages yet. Start the conversation.</p>
           ) : (

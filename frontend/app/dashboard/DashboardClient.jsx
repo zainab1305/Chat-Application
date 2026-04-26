@@ -9,6 +9,7 @@ export default function DashboardClient() {
   const ROOM_CODE_LENGTH = 6;
   const { data: session } = useSession();
   const router = useRouter();
+  const [toast, setToast] = useState(null);
 
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +24,12 @@ export default function DashboardClient() {
   const [notificationUnread, setNotificationUnread] = useState(0);
   const [roomInsights, setRoomInsights] = useState({});
   const [insightsLoading, setInsightsLoading] = useState(false);
+
+  function showToast(message, type = "success") {
+    setToast({ message, type });
+    window.clearTimeout(showToast.timeoutId);
+    showToast.timeoutId = window.setTimeout(() => setToast(null), 2400);
+  }
 
   const greetingName = useMemo(() => {
     if (!session?.user?.name) return session?.user?.email || "there";
@@ -168,7 +175,7 @@ export default function DashboardClient() {
     }
   }
 
-  async function openRoom(roomId) {
+  async function openRoom(roomId, options = {}) {
     try {
       await fetch("/api/room/last-seen", {
         method: "PATCH",
@@ -184,6 +191,15 @@ export default function DashboardClient() {
       setTotalUnread((total) => Math.max(0, total - deduction));
       return { ...current, [roomId]: 0 };
     });
+
+    if (options.toastMessage) {
+      showToast(options.toastMessage, options.toastType || "success");
+      window.setTimeout(() => {
+        router.push(`/chat/${roomId}`);
+      }, 300);
+      return;
+    }
+
     router.push(`/chat/${roomId}`);
   }
 
@@ -317,7 +333,7 @@ export default function DashboardClient() {
 
       setCreateRoomName("");
       await Promise.all([fetchRooms(), fetchUnread()]);
-      openRoom(data.room._id);
+      openRoom(data.room._id, { toastMessage: "Room created successfully" });
     } catch (err) {
       setError(err.message || "Failed to create room");
     } finally {
@@ -354,7 +370,7 @@ export default function DashboardClient() {
         });
       }
 
-      openRoom(data.room._id);
+      openRoom(data.room._id, { toastMessage: "Joined room successfully" });
     } catch (err) {
       setError(err.message || "Failed to join room");
     } finally {
@@ -513,7 +529,16 @@ export default function DashboardClient() {
           </div>
 
           {loading ? (
-            <p>Loading rooms...</p>
+            <div className="room-skeleton-grid" aria-label="Loading rooms">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="room-skeleton-card">
+                  <div className="skeleton-line skeleton-line-title" />
+                  <div className="skeleton-line skeleton-line-code" />
+                  <div className="skeleton-line skeleton-line-text" />
+                  <div className="skeleton-line skeleton-line-button" />
+                </div>
+              ))}
+            </div>
           ) : rooms.length === 0 ? (
             <p>No rooms yet. Create one or join with a code.</p>
           ) : (
@@ -545,6 +570,12 @@ export default function DashboardClient() {
             </div>
           )}
         </section>
+
+        {toast ? (
+          <div className={`app-toast ${toast.type === "error" ? "app-toast-error" : "app-toast-success"}`} role="status">
+            {toast.message}
+          </div>
+        ) : null}
       </div>
     </div>
   );
