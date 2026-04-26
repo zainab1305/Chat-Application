@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 
 const STATUS_LABELS = {
@@ -54,6 +54,7 @@ export default function TasksClient({ roomId }) {
   const [openMenuTaskId, setOpenMenuTaskId] = useState("");
   const [taskModal, setTaskModal] = useState({ open: false, mode: "create", taskId: "" });
   const [form, setForm] = useState(createTaskForm());
+  const taskModalRef = useRef(null);
 
   async function loadData(silent = false) {
     if (!silent) {
@@ -90,6 +91,14 @@ export default function TasksClient({ roomId }) {
   useEffect(() => {
     loadData();
   }, [roomId]);
+
+  useEffect(() => {
+    if (!taskModal.open) return;
+
+    requestAnimationFrame(() => {
+      taskModalRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [taskModal.open]);
 
   const groupedTasks = useMemo(
     () =>
@@ -249,12 +258,7 @@ export default function TasksClient({ roomId }) {
           <p>Move work from todo to done and keep the room organized.</p>
         </div>
 
-        <button
-          type="button"
-          className="primary-btn"
-          onClick={() => openCreateModal("todo")}
-          disabled={!canManageTasks}
-        >
+        <button type="button" className="primary-btn" onClick={() => openCreateModal("todo")} disabled={!canManageTasks}>
           Add Task
         </button>
       </div>
@@ -267,12 +271,7 @@ export default function TasksClient({ roomId }) {
                 <h3>{STATUS_LABELS[status]}</h3>
                 <p>{groupedTasks[status].length} tasks</p>
               </div>
-              <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => openCreateModal(status)}
-                disabled={!canManageTasks}
-              >
+              <button type="button" className="ghost-btn" onClick={() => openCreateModal(status)} disabled={!canManageTasks}>
                 Add Task
               </button>
             </div>
@@ -361,7 +360,7 @@ export default function TasksClient({ roomId }) {
 
       {taskModal.open ? (
         <div className="task-modal-backdrop" onClick={closeTaskModal}>
-          <div className="task-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="task-modal" ref={taskModalRef} onClick={(event) => event.stopPropagation()}>
             <div className="task-modal-head">
               <div>
                 <p className="dashboard-kicker">{taskModal.mode === "create" ? "Create Task" : "Edit Task"}</p>
