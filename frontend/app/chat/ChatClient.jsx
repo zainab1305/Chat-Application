@@ -28,8 +28,8 @@ export default function ChatClient({ roomId, roomCode }) {
   const endOfMessagesRef = useRef(null);
   const messageBoardRef = useRef(null);
 
-  function showToast(messageText, type = "success") {
-    setToast({ message: messageText, type });
+  function showToast(message, type = "success") {
+    setToast({ message, type });
     window.clearTimeout(showToast.timeoutId);
     showToast.timeoutId = window.setTimeout(() => setToast(null), 2200);
   }
@@ -178,22 +178,18 @@ export default function ChatClient({ roomId, roomCode }) {
     socket.on("messagePinned", onMessagePinned);
     socket.on("messageDeleted", onMessageDeleted);
 
-    socket.emit(
-      "joinRoom",
-      {
-        roomId,
-        user: {
-          id: session.user.id || session.user.email,
-          name: session.user.name,
-          email: session.user.email,
-        },
+    socket.emit("joinRoom", {
+      roomId,
+      user: {
+        id: session.user.id || session.user.email,
+        name: session.user.name,
+        email: session.user.email,
       },
-      (snapshot) => {
-        if (snapshot?.roomId === roomId) {
-          setOnlineUsers(snapshot.users || []);
-        }
+    }, (snapshot) => {
+      if (snapshot?.roomId === roomId) {
+        setOnlineUsers(snapshot.users || []);
       }
-    );
+    });
 
     return () => {
       socket.emit("leaveRoom", { roomId });
@@ -209,7 +205,7 @@ export default function ChatClient({ roomId, roomCode }) {
     if (!isNearBottom) return;
 
     endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [isNearBottom, messages]);
+  }, [messages]);
 
   useEffect(() => {
     const board = messageBoardRef.current;
@@ -254,6 +250,7 @@ export default function ChatClient({ roomId, roomCode }) {
 
   const sendMessage = async () => {
     if (!session) return;
+
     if (!message.trim()) return;
 
     setSendError("");
@@ -297,6 +294,7 @@ export default function ChatClient({ roomId, roomCode }) {
       };
 
       socket.emit("sendMessage", sentMessage);
+
       upsertMessage(sentMessage);
       setMessage("");
       setReplyDraft(null);
@@ -488,6 +486,7 @@ export default function ChatClient({ roomId, roomCode }) {
     );
   }
 
+
   return (
     <div
       className="room-chat-layout"
@@ -630,7 +629,7 @@ export default function ChatClient({ roomId, roomCode }) {
                   <p className="message-body">{msg.message}</p>
                   <p className="message-time-small">
                     {msg.type === "announcement" ? "Announcement" : msg.time}
-                    {msg.isPinned ? " | Pinned" : ""}
+                    {msg.isPinned ? " • Pinned" : ""}
                   </p>
                 </div>
               );
@@ -650,7 +649,7 @@ export default function ChatClient({ roomId, roomCode }) {
                   onClick={() => setReplyDraft(null)}
                   aria-label="Cancel reply"
                 >
-                  x
+                  ×
                 </button>
               </div>
 
@@ -665,6 +664,12 @@ export default function ChatClient({ roomId, roomCode }) {
           )}
 
           <div className="chat-input-row">
+            <button type="button" className="ghost-btn chat-mini-icon" aria-label="Emoji picker">
+              😊
+            </button>
+            <button type="button" className="ghost-btn chat-mini-icon" aria-label="Attach file">
+              📎
+            </button>
             <input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -680,16 +685,6 @@ export default function ChatClient({ roomId, roomCode }) {
               Send
             </button>
           </div>
-
-          {!isNearBottom && (
-            <button
-              type="button"
-              className="scroll-to-latest-btn"
-              onClick={() => endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })}
-            >
-              Jump to latest
-            </button>
-          )}
         </div>
       </section>
 
@@ -774,16 +769,16 @@ export default function ChatClient({ roomId, roomCode }) {
               })
             }
           >
-            <span className="menu-icon" aria-hidden="true">
-              {">"}
-            </span>
+            <span className="menu-icon" aria-hidden="true">↩</span>
             <span>Reply</span>
           </button>
 
-          <button type="button" className="menu-item" onClick={() => copyMessageText(contextMenu.text)}>
-            <span className="menu-icon" aria-hidden="true">
-              []
-            </span>
+          <button
+            type="button"
+            className="menu-item"
+            onClick={() => copyMessageText(contextMenu.text)}
+          >
+            <span className="menu-icon" aria-hidden="true">⧉</span>
             <span>Copy</span>
           </button>
 
@@ -795,9 +790,7 @@ export default function ChatClient({ roomId, roomCode }) {
                 className="menu-item"
                 onClick={() => togglePin(contextMenu.messageId)}
               >
-                <span className="menu-icon" aria-hidden="true">
-                  #
-                </span>
+                <span className="menu-icon" aria-hidden="true">📌</span>
                 <span>{contextMenu.isPinned ? "Unpin" : "Pin"}</span>
               </button>
               <div className="menu-separator" />
@@ -806,21 +799,13 @@ export default function ChatClient({ roomId, roomCode }) {
                 className="menu-item danger-btn"
                 onClick={() => deleteMessage(contextMenu.messageId)}
               >
-                <span className="menu-icon" aria-hidden="true">
-                  x
-                </span>
+                <span className="menu-icon" aria-hidden="true">🗑</span>
                 <span>Delete</span>
               </button>
             </>
           )}
         </div>
       )}
-
-      {toast ? (
-        <div className={`app-toast ${toast.type === "error" ? "app-toast-error" : "app-toast-success"}`} role="status">
-          {toast.message}
-        </div>
-      ) : null}
     </div>
   );
 }
