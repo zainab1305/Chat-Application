@@ -27,7 +27,7 @@ export default async function RoomLayout({ children, params }) {
     <div className="chat-page">
       <div className="chat-shell room-shell">
         <div className="chat-header room-header">
-          <div>
+          <div className="room-header-copy">
             <p className="dashboard-kicker">Room</p>
             <h1>{room.name}</h1>
             <p className="room-header-code">Room Code: {room.code}</p>

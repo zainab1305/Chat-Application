@@ -24,8 +24,15 @@ export default function ChatClient({ roomId, roomCode }) {
   const [pinnedDrawerOpen, setPinnedDrawerOpen] = useState(false);
   const [copiedInviteCode, setCopiedInviteCode] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  const [toast, setToast] = useState(null);
   const endOfMessagesRef = useRef(null);
   const messageBoardRef = useRef(null);
+
+  function showToast(messageText, type = "success") {
+    setToast({ message: messageText, type });
+    window.clearTimeout(showToast.timeoutId);
+    showToast.timeoutId = window.setTimeout(() => setToast(null), 2200);
+  }
 
   const pinnedMessages = useMemo(() => {
     return [...messages]
@@ -171,18 +178,22 @@ export default function ChatClient({ roomId, roomCode }) {
     socket.on("messagePinned", onMessagePinned);
     socket.on("messageDeleted", onMessageDeleted);
 
-    socket.emit("joinRoom", {
-      roomId,
-      user: {
-        id: session.user.id || session.user.email,
-        name: session.user.name,
-        email: session.user.email,
+    socket.emit(
+      "joinRoom",
+      {
+        roomId,
+        user: {
+          id: session.user.id || session.user.email,
+          name: session.user.name,
+          email: session.user.email,
+        },
       },
-    }, (snapshot) => {
-      if (snapshot?.roomId === roomId) {
-        setOnlineUsers(snapshot.users || []);
+      (snapshot) => {
+        if (snapshot?.roomId === roomId) {
+          setOnlineUsers(snapshot.users || []);
+        }
       }
-    });
+    );
 
     return () => {
       socket.emit("leaveRoom", { roomId });
@@ -198,7 +209,7 @@ export default function ChatClient({ roomId, roomCode }) {
     if (!isNearBottom) return;
 
     endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages]);
+  }, [isNearBottom, messages]);
 
   useEffect(() => {
     const board = messageBoardRef.current;
@@ -243,7 +254,6 @@ export default function ChatClient({ roomId, roomCode }) {
 
   const sendMessage = async () => {
     if (!session) return;
-
     if (!message.trim()) return;
 
     setSendError("");
@@ -287,10 +297,10 @@ export default function ChatClient({ roomId, roomCode }) {
       };
 
       socket.emit("sendMessage", sentMessage);
-
       upsertMessage(sentMessage);
       setMessage("");
       setReplyDraft(null);
+      showToast("Message sent");
     } catch (err) {
       setSendError(err.message || "Failed to send message");
     }
@@ -329,6 +339,7 @@ export default function ChatClient({ roomId, roomCode }) {
       upsertMessage(data.message);
       setAnnouncementText("");
       setAnnouncementsOpen(false);
+      showToast("Announcement posted");
     } catch (err) {
       setSendError(err.message || "Failed to post announcement");
     }
@@ -339,6 +350,7 @@ export default function ChatClient({ roomId, roomCode }) {
       await navigator.clipboard.writeText(roomCode || "");
       setCopiedInviteCode(true);
       window.setTimeout(() => setCopiedInviteCode(false), 1400);
+      showToast("Room code copied");
     } catch {
       setSendError("Failed to copy invite code");
     }
@@ -366,6 +378,7 @@ export default function ChatClient({ roomId, roomCode }) {
 
       updatePinnedMessage({ roomId, message: data.message });
       setContextMenu(null);
+      showToast(data.message?.isPinned ? "Message pinned" : "Message unpinned");
     } catch (err) {
       setSendError(err.message || "Failed to update pin");
     }
@@ -387,6 +400,7 @@ export default function ChatClient({ roomId, roomCode }) {
       socket.emit("messageDeleted", { roomId, messageId });
       removeMessageFromState(messageId);
       setContextMenu(null);
+      showToast("Message deleted");
     } catch (err) {
       setSendError(err.message || "Failed to delete message");
     }
@@ -401,6 +415,7 @@ export default function ChatClient({ roomId, roomCode }) {
     try {
       await navigator.clipboard.writeText(text || "");
       setContextMenu(null);
+      showToast("Message copied");
     } catch {
       setSendError("Failed to copy message");
     }
@@ -473,7 +488,6 @@ export default function ChatClient({ roomId, roomCode }) {
     );
   }
 
-
   return (
     <div
       className="room-chat-layout"
@@ -486,17 +500,17 @@ export default function ChatClient({ roomId, roomCode }) {
         <div className="chat-collapsible-row">
           <button
             type="button"
-            className="ghost-btn"
+            className={`ghost-btn room-filter-btn ${announcementsOpen ? "active" : ""}`}
             onClick={() => setAnnouncementsOpen((current) => !current)}
           >
-            Announcements ({announcements.length})
+            Announcements <span className="room-filter-count">{announcements.length}</span>
           </button>
           <button
             type="button"
-            className="ghost-btn"
+            className={`ghost-btn room-filter-btn ${pinnedPreviewOpen ? "active" : ""}`}
             onClick={() => setPinnedPreviewOpen((current) => !current)}
           >
-            Pinned ({pinnedMessages.length})
+            Pinned <span className="room-filter-count">{pinnedMessages.length}</span>
           </button>
         </div>
 
@@ -616,7 +630,7 @@ export default function ChatClient({ roomId, roomCode }) {
                   <p className="message-body">{msg.message}</p>
                   <p className="message-time-small">
                     {msg.type === "announcement" ? "Announcement" : msg.time}
-                    {msg.isPinned ? " • Pinned" : ""}
+                    {msg.isPinned ? " | Pinned" : ""}
                   </p>
                 </div>
               );
@@ -636,7 +650,7 @@ export default function ChatClient({ roomId, roomCode }) {
                   onClick={() => setReplyDraft(null)}
                   aria-label="Cancel reply"
                 >
-                  ×
+                  x
                 </button>
               </div>
 
@@ -651,12 +665,6 @@ export default function ChatClient({ roomId, roomCode }) {
           )}
 
           <div className="chat-input-row">
-            <button type="button" className="ghost-btn chat-mini-icon" aria-label="Emoji picker">
-              😊
-            </button>
-            <button type="button" className="ghost-btn chat-mini-icon" aria-label="Attach file">
-              📎
-            </button>
             <input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -672,6 +680,16 @@ export default function ChatClient({ roomId, roomCode }) {
               Send
             </button>
           </div>
+
+          {!isNearBottom && (
+            <button
+              type="button"
+              className="scroll-to-latest-btn"
+              onClick={() => endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })}
+            >
+              Jump to latest
+            </button>
+          )}
         </div>
       </section>
 
@@ -756,16 +774,16 @@ export default function ChatClient({ roomId, roomCode }) {
               })
             }
           >
-            <span className="menu-icon" aria-hidden="true">↩</span>
+            <span className="menu-icon" aria-hidden="true">
+              {">"}
+            </span>
             <span>Reply</span>
           </button>
 
-          <button
-            type="button"
-            className="menu-item"
-            onClick={() => copyMessageText(contextMenu.text)}
-          >
-            <span className="menu-icon" aria-hidden="true">⧉</span>
+          <button type="button" className="menu-item" onClick={() => copyMessageText(contextMenu.text)}>
+            <span className="menu-icon" aria-hidden="true">
+              []
+            </span>
             <span>Copy</span>
           </button>
 
@@ -777,7 +795,9 @@ export default function ChatClient({ roomId, roomCode }) {
                 className="menu-item"
                 onClick={() => togglePin(contextMenu.messageId)}
               >
-                <span className="menu-icon" aria-hidden="true">📌</span>
+                <span className="menu-icon" aria-hidden="true">
+                  #
+                </span>
                 <span>{contextMenu.isPinned ? "Unpin" : "Pin"}</span>
               </button>
               <div className="menu-separator" />
@@ -786,13 +806,21 @@ export default function ChatClient({ roomId, roomCode }) {
                 className="menu-item danger-btn"
                 onClick={() => deleteMessage(contextMenu.messageId)}
               >
-                <span className="menu-icon" aria-hidden="true">🗑</span>
+                <span className="menu-icon" aria-hidden="true">
+                  x
+                </span>
                 <span>Delete</span>
               </button>
             </>
           )}
         </div>
       )}
+
+      {toast ? (
+        <div className={`app-toast ${toast.type === "error" ? "app-toast-error" : "app-toast-success"}`} role="status">
+          {toast.message}
+        </div>
+      ) : null}
     </div>
   );
 }

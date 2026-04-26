@@ -9,12 +9,20 @@ export default function RoomActions({ roomId, roomCode, isOwner }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  function showToast(message) {
+    setToast(message);
+    window.clearTimeout(showToast.timeoutId);
+    showToast.timeoutId = window.setTimeout(() => setToast(null), 2200);
+  }
 
   const copyRoomCode = async () => {
     try {
       await navigator.clipboard.writeText(roomCode || "");
       setCopiedCode(true);
       window.setTimeout(() => setCopiedCode(false), 1400);
+      showToast("Room code copied");
     } catch {
       window.alert("Unable to copy room code");
     }
@@ -26,6 +34,7 @@ export default function RoomActions({ roomId, roomCode, isOwner }) {
       await navigator.clipboard.writeText(invite);
       setCopiedInvite(true);
       window.setTimeout(() => setCopiedInvite(false), 1400);
+      showToast("Invite link copied");
     } catch {
       window.alert("Unable to copy invite link");
     }
@@ -75,10 +84,12 @@ export default function RoomActions({ roomId, roomCode, isOwner }) {
           aria-label="Room settings"
           title="Room settings"
         >
-          ⚙
+          Manage
         </button>
       )}
-      <button className="ghost-btn" onClick={() => router.push("/dashboard")}>Dashboard</button>
+      <button className="ghost-btn" onClick={() => router.push("/dashboard")}>
+        Dashboard
+      </button>
       {isOwner && (
         <button className="danger-btn" onClick={handleDelete} disabled={isDeleting}>
           {isDeleting ? "Deleting..." : "Delete Room"}
@@ -87,6 +98,11 @@ export default function RoomActions({ roomId, roomCode, isOwner }) {
       <button className="ghost-btn" onClick={() => signOut({ callbackUrl: "/login" })}>
         Logout
       </button>
+      {toast ? (
+        <div className="app-toast app-toast-success room-header-toast" role="status">
+          {toast}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -382,10 +382,10 @@ export default function DashboardClient() {
     <div className="dashboard-page">
       <div className="dashboard-shell">
         <header className="dashboard-header">
-          <div>
+          <div className="dashboard-hero-copy">
             <p className="dashboard-kicker">Workspace</p>
             <h1>Welcome, {greetingName}</h1>
-            <p>Pick a room to start collaborating.</p>
+            <p className="dashboard-hero-text">Pick a room, drop updates, and keep your team in flow.</p>
             {totalUnread > 0 ? (
               <p className="dashboard-unread-indicator">{totalUnread} unread updates across rooms</p>
             ) : null}
@@ -451,7 +451,7 @@ export default function DashboardClient() {
         {error && <div className="error-banner">{error}</div>}
 
         <section className="dashboard-grid dashboard-quick-actions">
-          <article className="card">
+          <article className="card action-card action-card-primary">
             <h2>Create Room</h2>
             <p>Start a fresh collaboration space for your team.</p>
 
@@ -471,7 +471,7 @@ export default function DashboardClient() {
             </form>
           </article>
 
-          <article className="card">
+          <article className="card action-card action-card-secondary">
             <h2>Join Room</h2>
             <p>Already have a room code? Enter it and jump in.</p>
 
@@ -520,7 +520,7 @@ export default function DashboardClient() {
           </article>
         </section>
 
-        <section className="room-list card">
+        <section className="room-list card recent-rooms-panel">
           <div className="room-list-head">
             <h2>Recent Rooms</h2>
             <button className="ghost-btn" onClick={fetchRooms}>
