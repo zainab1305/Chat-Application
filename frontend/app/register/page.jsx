@@ -7,13 +7,7 @@ import { useState } from "react";
 
 function GoogleIcon() {
   return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 48 48"
-      aria-hidden="true"
-      style={{ flexShrink: 0 }}
-    >
+    <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true" style={{ flexShrink: 0 }}>
       <path
         fill="#EA4335"
         d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
@@ -73,119 +67,147 @@ export default function RegisterPage() {
 
   return (
     <div className="login-page">
-      <span className="login-orb login-orb--green" aria-hidden="true" />
-      <span className="login-orb login-orb--gold" aria-hidden="true" />
+      <span className="login-glow login-glow-primary" aria-hidden="true" />
+      <span className="login-glow login-glow-secondary" aria-hidden="true" />
 
-      <div className="login-card">
-        <div className="login-brand">
-          <div className="login-logo" aria-hidden="true">
-            <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
-              <rect width="38" height="38" rx="11" fill="#115e42" />
-              <path
-                d="M10 14a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-4.5l-4 3.5V23H12a2 2 0 0 1-2-2v-7z"
-                fill="#f0c66e"
-              />
-              <circle cx="16" cy="17.5" r="1.4" fill="#115e42" />
-              <circle cx="22" cy="17.5" r="1.4" fill="#115e42" />
-            </svg>
-          </div>
-          <h1 className="login-title">WorkspaceOne</h1>
-          <p className="login-tagline">
-            Create your account to join rooms, track tasks, and share resources.
+      <section className="login-stage">
+        <div className="login-showcase">
+          <p className="dashboard-kicker">Join the workspace</p>
+          <h1 className="login-stage-title">Create your account and start collaborating in minutes.</h1>
+          <p className="login-stage-copy">
+            Set up your profile once, then move between rooms, tasks, and shared resources with a single account.
           </p>
+
+          <div className="login-stage-preview" aria-hidden="true">
+            <div className="login-preview-card login-preview-card-main">
+              <div className="login-preview-head">
+                <span className="ui-dot" />
+                <span className="ui-dot" />
+                <span className="ui-dot" />
+                <p>Quick setup</p>
+              </div>
+              <div className="login-preview-body">
+                <div className="login-preview-stat">
+                  <strong>3 steps</strong>
+                  <span>to enter your first room</span>
+                </div>
+                <div className="login-preview-row">
+                  <span className="login-preview-pill active">Create profile</span>
+                  <span className="login-preview-pill">Join room</span>
+                </div>
+                <div className="login-preview-message">
+                  <span>Ready</span>
+                  Chat, tasks, and resources unlock right after sign up.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {error ? (
-          <div className="login-alert login-alert--error" role="alert">
-            <span aria-hidden="true">!</span>
-            {error}
-          </div>
-        ) : null}
-
-        <button
-          type="button"
-          id="register-google-btn"
-          className="login-google-btn"
-          onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-        >
-          <GoogleIcon />
-          Continue with Google
-        </button>
-
-        <div className="login-divider" aria-hidden="true">
-          <span />
-          <p>or create with email</p>
-          <span />
-        </div>
-
-        <form className="login-form" onSubmit={handleSubmit}>
-          <div className="login-field">
-            <label htmlFor="register-name">Name</label>
-            <input
-              id="register-name"
-              type="text"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Your name"
-              autoComplete="name"
-              required
-            />
+        <div className="login-card">
+          <div className="login-brand">
+            <div className="login-logo" aria-hidden="true">
+              <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
+                <rect width="38" height="38" rx="11" fill="#1f7a5a" />
+                <path
+                  d="M10 14a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-4.5l-4 3.5V23H12a2 2 0 0 1-2-2v-7z"
+                  fill="#f0c66e"
+                />
+                <circle cx="16" cy="17.5" r="1.4" fill="#1f7a5a" />
+                <circle cx="22" cy="17.5" r="1.4" fill="#1f7a5a" />
+              </svg>
+            </div>
+            <h1 className="login-title">WorkspaceOne</h1>
+            <p className="login-tagline">Create your account to join rooms, track work, and share context.</p>
           </div>
 
-          <div className="login-field">
-            <label htmlFor="register-email">Email</label>
-            <input
-              id="register-email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@example.com"
-              autoComplete="email"
-              required
-            />
-          </div>
-
-          <div className="login-field">
-            <label htmlFor="register-password">Password</label>
-            <input
-              id="register-password"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="At least 6 characters"
-              autoComplete="new-password"
-              minLength={6}
-              required
-            />
-          </div>
+          {error ? (
+            <div className="login-alert login-alert-error" role="alert">
+              <span aria-hidden="true">!</span>
+              {error}
+            </div>
+          ) : null}
 
           <button
-            id="register-submit-btn"
-            type="submit"
-            disabled={loading}
-            className="login-submit"
+            type="button"
+            id="register-google-btn"
+            className="login-google-btn"
+            onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
           >
-            {loading ? (
-              <>
-                <span className="login-spinner" aria-hidden="true" />
-                Creating account…
-              </>
-            ) : (
-              "Create Account"
-            )}
+            <GoogleIcon />
+            Continue with Google
           </button>
-        </form>
 
-        <p className="login-register">
-          Already have an account? <Link href="/login">Sign in</Link>
-        </p>
+          <div className="login-divider" aria-hidden="true">
+            <span />
+            <p>or create with email</p>
+            <span />
+          </div>
 
-        <footer className="login-footer">
-          <a href="#">Privacy Policy</a>
-          <span aria-hidden="true">·</span>
-          <a href="#">Terms of Service</a>
-        </footer>
-      </div>
+          <form className="login-form" onSubmit={handleSubmit}>
+            <div className="login-field">
+              <label htmlFor="register-name">Name</label>
+              <input
+                id="register-name"
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Your name"
+                autoComplete="name"
+                required
+              />
+            </div>
+
+            <div className="login-field">
+              <label htmlFor="register-email">Email</label>
+              <input
+                id="register-email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                required
+              />
+            </div>
+
+            <div className="login-field">
+              <label htmlFor="register-password">Password</label>
+              <input
+                id="register-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="At least 6 characters"
+                autoComplete="new-password"
+                minLength={6}
+                required
+              />
+            </div>
+
+            <button id="register-submit-btn" type="submit" disabled={loading} className="login-submit">
+              {loading ? (
+                <>
+                  <span className="login-spinner" aria-hidden="true" />
+                  Creating account...
+                </>
+              ) : (
+                "Create Account"
+              )}
+            </button>
+          </form>
+
+          <p className="login-register">
+            Already have an account? <Link href="/login">Sign in</Link>
+          </p>
+
+          <footer className="login-footer">
+            <a href="#">Privacy Policy</a>
+            <span aria-hidden="true">|</span>
+            <a href="#">Terms of Service</a>
+          </footer>
+        </div>
+      </section>
     </div>
   );
 }
