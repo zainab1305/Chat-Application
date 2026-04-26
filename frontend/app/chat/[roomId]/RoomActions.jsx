@@ -4,9 +4,32 @@ import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export default function RoomActions({ roomId, isOwner }) {
+export default function RoomActions({ roomId, roomCode, isOwner }) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
+
+  const copyRoomCode = async () => {
+    try {
+      await navigator.clipboard.writeText(roomCode || "");
+      setCopiedCode(true);
+      window.setTimeout(() => setCopiedCode(false), 1400);
+    } catch {
+      window.alert("Unable to copy room code");
+    }
+  };
+
+  const copyInviteLink = async () => {
+    try {
+      const invite = `${window.location.origin}/room/${roomId}`;
+      await navigator.clipboard.writeText(invite);
+      setCopiedInvite(true);
+      window.setTimeout(() => setCopiedInvite(false), 1400);
+    } catch {
+      window.alert("Unable to copy invite link");
+    }
+  };
 
   const handleDelete = async () => {
     if (isDeleting) return;
@@ -38,6 +61,23 @@ export default function RoomActions({ roomId, isOwner }) {
 
   return (
     <div className="chat-header-actions room-header-actions">
+      <button type="button" className="ghost-btn room-icon-btn" onClick={copyRoomCode}>
+        {copiedCode ? "Copied" : "Copy Code"}
+      </button>
+      <button type="button" className="secondary-btn" onClick={copyInviteLink}>
+        {copiedInvite ? "Invite Copied" : "Invite"}
+      </button>
+      {isOwner && (
+        <button
+          type="button"
+          className="ghost-btn room-icon-btn"
+          onClick={() => router.push(`/chat/${roomId}/members`)}
+          aria-label="Room settings"
+          title="Room settings"
+        >
+          ⚙
+        </button>
+      )}
       <button className="ghost-btn" onClick={() => router.push("/dashboard")}>Dashboard</button>
       {isOwner && (
         <button className="danger-btn" onClick={handleDelete} disabled={isDeleting}>

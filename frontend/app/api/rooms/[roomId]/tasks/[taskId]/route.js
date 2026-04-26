@@ -25,10 +25,22 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    const { status, assignedTo, title, description } = await req.json();
+    const { status, assignedTo, title, description, dueDate, priority } = await req.json();
 
     const assigneeId = task.assignedTo ? task.assignedTo.toString() : null;
     const isAssignee = assigneeId === access.user._id.toString();
+
+    const allowedPriorities = ["low", "med", "high"];
+    const nextPriority = priority === undefined ? undefined : priority;
+    const nextDueDate = dueDate === undefined ? undefined : (dueDate ? new Date(dueDate) : null);
+
+    if (nextPriority !== undefined && !allowedPriorities.includes(nextPriority)) {
+      return NextResponse.json({ error: "Invalid task priority" }, { status: 400 });
+    }
+
+    if (nextDueDate instanceof Date && Number.isNaN(nextDueDate.getTime())) {
+      return NextResponse.json({ error: "Invalid due date" }, { status: 400 });
+    }
 
     if (status) {
       const validStatuses = ["todo", "inprogress", "done"];
@@ -62,7 +74,7 @@ export async function PATCH(req, { params }) {
       }
     }
 
-    if ((assignedTo !== undefined || typeof title === "string" || typeof description === "string") && !access.canManageRoom) {
+    if ((assignedTo !== undefined || typeof title === "string" || typeof description === "string" || dueDate !== undefined || priority !== undefined) && !access.canManageRoom) {
       return NextResponse.json(
         { error: "Only the room owner can edit task details or assignment" },
         { status: 403 }
@@ -86,6 +98,8 @@ export async function PATCH(req, { params }) {
     if (assignedTo !== undefined) task.assignedTo = assignedTo || null;
     if (typeof title === "string") task.title = title.trim();
     if (typeof description === "string") task.description = description.trim();
+    if (nextDueDate !== undefined) task.dueDate = nextDueDate;
+    if (nextPriority !== undefined) task.priority = nextPriority;
 
     await task.save();
 

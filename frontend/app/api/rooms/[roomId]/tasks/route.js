@@ -63,7 +63,7 @@ export async function POST(req, { params }) {
       );
     }
 
-    const { title, description, assignedTo } = await req.json();
+    const { title, description, assignedTo, dueDate, priority, status } = await req.json();
 
     if (!title || !title.trim()) {
       return NextResponse.json({ error: "Task title is required" }, { status: 400 });
@@ -82,13 +82,33 @@ export async function POST(req, { params }) {
       }
     }
 
+    const allowedPriorities = ["low", "med", "high"];
+    const nextPriority = priority === undefined ? "med" : priority;
+    const nextDueDate = dueDate ? new Date(dueDate) : null;
+    const allowedStatuses = ["todo", "inprogress", "done"];
+    const nextStatus = status === undefined ? "todo" : status;
+
+    if (!allowedPriorities.includes(nextPriority)) {
+      return NextResponse.json({ error: "Invalid task priority" }, { status: 400 });
+    }
+
+    if (!allowedStatuses.includes(nextStatus)) {
+      return NextResponse.json({ error: "Invalid task status" }, { status: 400 });
+    }
+
+    if (nextDueDate && Number.isNaN(nextDueDate.getTime())) {
+      return NextResponse.json({ error: "Invalid due date" }, { status: 400 });
+    }
+
     const task = await Task.create({
       roomId,
       title: title.trim(),
       description: description?.trim() || "",
+      dueDate: nextDueDate,
+      priority: nextPriority,
       assignedTo: assignedTo || null,
       createdBy: access.user._id,
-      status: "todo",
+      status: nextStatus,
     });
 
     const createdTask = await Task.findById(task._id)

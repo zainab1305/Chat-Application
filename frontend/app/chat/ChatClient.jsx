@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { socket } from "@/lib/socket";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
-export default function ChatClient({ roomId }) {
+export default function ChatClient({ roomId, roomCode }) {
   const { data: session } = useSession();
   const router = useRouter();
 
@@ -14,12 +14,15 @@ export default function ChatClient({ roomId }) {
   const [messages, setMessages] = useState([]);
   const [onlineUsers, setOnlineUsers] = useState([]);
   const [canManageMessages, setCanManageMessages] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
   const [replyDraft, setReplyDraft] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [sendError, setSendError] = useState("");
+  const [announcementsOpen, setAnnouncementsOpen] = useState(false);
+  const [pinnedPreviewOpen, setPinnedPreviewOpen] = useState(true);
+  const [pinnedDrawerOpen, setPinnedDrawerOpen] = useState(false);
+  const [copiedInviteCode, setCopiedInviteCode] = useState(false);
   const endOfMessagesRef = useRef(null);
 
   const pinnedMessages = useMemo(() => {
@@ -41,6 +44,11 @@ export default function ChatClient({ roomId }) {
         return rightTime - leftTime;
       });
   }, [messages]);
+
+  const currentUserLabel = useMemo(
+    () => session?.user?.name || session?.user?.email || "You",
+    [session?.user?.name, session?.user?.email]
+  );
 
   const upsertMessage = (incoming) => {
     if (!incoming?._id) return;
@@ -188,7 +196,7 @@ export default function ChatClient({ roomId }) {
     endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const markRoomAsSeen = async () => {
+  const markRoomAsSeen = useCallback(async () => {
     if (!session?.user || !roomId) return;
 
     try {
@@ -200,7 +208,7 @@ export default function ChatClient({ roomId }) {
     } catch {
       // Best-effort sync; unread endpoint will still compute from latest successful write.
     }
-  };
+  }, [roomId, session?.user]);
 
   useEffect(() => {
     if (!session?.user || loading) return;
@@ -210,7 +218,7 @@ export default function ChatClient({ roomId }) {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [roomId, loading, messages.length, session?.user]);
+  }, [loading, messages.length, markRoomAsSeen, session?.user]);
 
   const sendMessage = async () => {
     if (!session) return;
@@ -299,9 +307,19 @@ export default function ChatClient({ roomId }) {
 
       upsertMessage(data.message);
       setAnnouncementText("");
-      setNotificationsOpen(false);
+      setAnnouncementsOpen(false);
     } catch (err) {
       setSendError(err.message || "Failed to post announcement");
+    }
+  };
+
+  const copyInviteCode = async () => {
+    try {
+      await navigator.clipboard.writeText(roomCode || "");
+      setCopiedInviteCode(true);
+      window.setTimeout(() => setCopiedInviteCode(false), 1400);
+    } catch {
+      setSendError("Failed to copy invite code");
     }
   };
 
@@ -409,137 +427,268 @@ export default function ChatClient({ roomId }) {
 
 
   return (
-    <div onClick={() => setContextMenu(null)} onContextMenuCapture={() => setContextMenu(null)}>
+    <div
+      className="room-chat-layout"
+      onClick={() => setContextMenu(null)}
+      onContextMenuCapture={() => setContextMenu(null)}
+    >
       {sendError && <p className="error-banner">{sendError}</p>}
 
-      <section className="notification-panel">
-        <div className="notification-panel-head">
-          <div>
-            <p className="dashboard-kicker">Announcements</p>
-            <h2>Announcements</h2>
-          </div>
+      <section className="room-chat-main">
+        <div className="chat-collapsible-row">
           <button
             type="button"
             className="ghost-btn"
-            onClick={() => setNotificationsOpen((current) => !current)}
+            onClick={() => setAnnouncementsOpen((current) => !current)}
           >
-            {notificationsOpen ? "Close" : "Open"}
+            Announcements ({announcements.length})
+          </button>
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={() => setPinnedPreviewOpen((current) => !current)}
+          >
+            Pinned ({pinnedMessages.length})
           </button>
         </div>
 
-        {notificationsOpen && (
-          <div className="notification-panel-body">
-            <div className="notification-tabs">
-              <button type="button" className="notification-tab active">
-                Announcements ({announcements.length})
+        {announcementsOpen && (
+          <section className="notification-panel">
+            <div className="notification-panel-head">
+              <div>
+                <p className="dashboard-kicker">Announcements</p>
+                <h2>Announcements</h2>
+              </div>
+            </div>
+
+            <div className="notification-panel-body">
+              {canManageMessages && (
+                <div className="notification-compose">
+                  <textarea
+                    value={announcementText}
+                    onChange={(e) => setAnnouncementText(e.target.value)}
+                    placeholder="Post an announcement for the room..."
+                    rows={3}
+                  />
+                  <button className="secondary-btn" onClick={postAnnouncement}>
+                    Post Announcement
+                  </button>
+                </div>
+              )}
+
+              {announcements.length === 0 ? (
+                <p className="message-empty">No announcements yet.</p>
+              ) : (
+                <div className="announcement-feed">
+                  {announcements.slice(0, 3).map((item) => (
+                    <article key={item._id} className="announcement-feed-item">
+                      <div className="announcement-feed-meta">
+                        <span>{item.senderName}</span>
+                        <span>{item.time}</span>
+                      </div>
+                      <p>{item.message}</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {pinnedPreviewOpen && (
+          <section className="pinned-section pinned-preview-panel">
+            <div className="pinned-section-head">
+              <h2>Pinned ({pinnedMessages.length})</h2>
+              <button
+                type="button"
+                className="ghost-btn"
+                onClick={() => setPinnedDrawerOpen(true)}
+                disabled={pinnedMessages.length === 0}
+              >
+                Open Drawer
               </button>
             </div>
 
-            {canManageMessages && (
-              <div className="notification-compose">
-                <textarea
-                  value={announcementText}
-                  onChange={(e) => setAnnouncementText(e.target.value)}
-                  placeholder="Post an announcement for the room..."
-                  rows={3}
-                />
-                <button className="secondary-btn" onClick={postAnnouncement}>
-                  Post Announcement
-                </button>
-              </div>
-            )}
-
-            {announcements.length === 0 ? (
-              <p className="message-empty">No announcements yet.</p>
+            {pinnedMessages.length === 0 ? (
+              <p className="message-empty pinned-empty">No pinned messages yet.</p>
             ) : (
-              <div className="announcement-feed">
-                {announcements.map((item) => (
-                  <article key={item._id} className="announcement-feed-item">
-                    <div className="announcement-feed-meta">
+              <div className="pinned-list">
+                {pinnedMessages.slice(0, 2).map((item) => (
+                  <button
+                    key={item._id}
+                    type="button"
+                    className="pinned-card"
+                    onClick={() => {
+                      scrollToMessage(item._id);
+                      setPinnedDrawerOpen(true);
+                    }}
+                  >
+                    <div className="message-meta">
                       <span>{item.senderName}</span>
                       <span>{item.time}</span>
                     </div>
                     <p>{item.message}</p>
-                  </article>
+                  </button>
                 ))}
               </div>
             )}
-          </div>
+          </section>
         )}
-      </section>
 
-      <section className="pinned-section">
-        <div className="pinned-section-head">
-          <h2>Pinned</h2>
-          <p>{pinnedMessages.length} pinned message{pinnedMessages.length === 1 ? "" : "s"}</p>
-        </div>
+        <div className="message-board chat-message-board">
+          {messages.length === 0 ? (
+            <p className="message-empty">No messages yet. Start the conversation.</p>
+          ) : (
+            messages.map((msg, i) => {
+              const isMe = msg.senderName === currentUserLabel;
+              const isReply = Boolean(msg.replyTo?.senderName && msg.replyTo?.message);
 
-        {pinnedMessages.length === 0 ? (
-          <p className="message-empty pinned-empty">No pinned messages yet.</p>
-        ) : (
-          <div className="pinned-list">
-            {pinnedMessages.map((item) => (
-              <button
-                key={item._id}
-                type="button"
-                className="pinned-card"
-                onClick={() => scrollToMessage(item._id)}
-              >
-                <div className="message-meta">
-                  <span>{item.senderName}</span>
-                  <span>{item.time}</span>
-                </div>
-                <p>{item.message}</p>
-                <span className="pinned-badge">Pinned</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+              return (
+                <div
+                  id={`message-${msg._id}`}
+                  key={`${msg._id || i}-${msg.time}`}
+                  className={`message-item ${msg.type === "announcement" ? "announcement-message" : ""} ${isMe ? "mine" : ""} ${isReply ? "reply-message-theme" : ""}`}
+                  onContextMenu={(event) => openContextMenu(event, msg)}
+                >
+                  <p className="message-sender">{isMe ? "You" : msg.senderName}</p>
 
-      <div className="message-board">
-        {messages.length === 0 ? (
-          <p className="message-empty">No messages yet. Start the conversation.</p>
-        ) : (
-          messages.map((msg, i) => {
-            const isMe = msg.senderName === (session?.user?.name || session?.user?.email);
-            const isReply = Boolean(msg.replyTo?.senderName && msg.replyTo?.message);
-
-            return (
-              <div
-                id={`message-${msg._id}`}
-                key={`${msg._id || i}-${msg.time}`}
-                className={`message-item ${msg.type === "announcement" ? "announcement-message" : ""} ${isMe ? "mine" : ""} ${isReply ? "reply-message-theme" : ""}`}
-                onContextMenu={(event) => openContextMenu(event, msg)}
-              >
-                <div className="message-meta">
-                  <span>{msg.senderName}</span>
-                  <span>
-                    {msg.type === "announcement" ? "Announcement" : msg.time}
-                    {msg.isPinned ? " • Pinned" : ""}
-                  </span>
-                </div>
-
-                {msg.replyTo?.senderName && msg.replyTo?.message && (
-                  <div className="reply-quote reply-quote-inline">
-                    <span className="reply-quote-label">Replying to {msg.replyTo.senderName}</span>
-                    <div className="reply-quote-body">
-                      <span className="reply-quote-bar" aria-hidden="true" />
-                      <div className="reply-quote-content">
-                        <span className="reply-quote-name">{msg.replyTo.senderName}</span>
-                        <p>{msg.replyTo.message}</p>
+                  {msg.replyTo?.senderName && msg.replyTo?.message && (
+                    <div className="reply-quote reply-quote-inline">
+                      <span className="reply-quote-label">Replying to {msg.replyTo.senderName}</span>
+                      <div className="reply-quote-body">
+                        <span className="reply-quote-bar" aria-hidden="true" />
+                        <div className="reply-quote-content">
+                          <span className="reply-quote-name">{msg.replyTo.senderName}</span>
+                          <p>{msg.replyTo.message}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <p>{msg.message}</p>
+                  <p className="message-body">{msg.message}</p>
+                  <p className="message-time-small">
+                    {msg.type === "announcement" ? "Announcement" : msg.time}
+                    {msg.isPinned ? " • Pinned" : ""}
+                  </p>
+                </div>
+              );
+            })
+          )}
+          <div ref={endOfMessagesRef} />
+        </div>
+
+        <div className="composer chat-composer-sticky">
+          {replyDraft && (
+            <div className="reply-quote reply-quote-composer">
+              <div className="reply-preview-head">
+                <span className="reply-quote-label">Replying to {replyDraft.senderName}</span>
+                <button
+                  type="button"
+                  className="reply-preview-close"
+                  onClick={() => setReplyDraft(null)}
+                  aria-label="Cancel reply"
+                >
+                  ×
+                </button>
               </div>
-            );
-          })
-        )}
-        <div ref={endOfMessagesRef} />
-      </div>
+
+              <div className="reply-quote-body">
+                <span className="reply-quote-bar" aria-hidden="true" />
+                <div className="reply-quote-content">
+                  <span className="reply-quote-name">{replyDraft.senderName}</span>
+                  <p>{replyDraft.message}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="chat-input-row">
+            <button type="button" className="ghost-btn chat-mini-icon" aria-label="Emoji picker">
+              😊
+            </button>
+            <button type="button" className="ghost-btn chat-mini-icon" aria-label="Attach file">
+              📎
+            </button>
+            <input
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              placeholder="Type a message..."
+            />
+            <button className="primary-btn" onClick={sendMessage}>
+              Send
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <aside className="chat-context-sidebar">
+        <div className="chat-context-card">
+          <p className="dashboard-kicker">Active now</p>
+          <h3>{onlineUsers.length} online</h3>
+          <p className="chat-context-sub">Live member presence in this room</p>
+
+          {onlineUsers.length > 0 ? (
+            <div className="online-users-list chat-context-users">
+              {onlineUsers.map((user) => (
+                <span key={`${user.id}-${user.email}`} className="online-user-pill">
+                  {user.name}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="chat-context-sub">No one is online right now.</p>
+          )}
+        </div>
+
+        <div className="chat-context-card">
+          <p className="dashboard-kicker">Invite code</p>
+          <h3>{roomCode}</h3>
+          <button type="button" className="secondary-btn" onClick={copyInviteCode}>
+            {copiedInviteCode ? "Copied" : "Copy Code"}
+          </button>
+        </div>
+      </aside>
+
+      {pinnedDrawerOpen && (
+        <aside className="pinned-drawer" onClick={(event) => event.stopPropagation()}>
+          <div className="pinned-drawer-head">
+            <h3>Pinned ({pinnedMessages.length})</h3>
+            <button type="button" className="ghost-btn" onClick={() => setPinnedDrawerOpen(false)}>
+              Close
+            </button>
+          </div>
+
+          {pinnedMessages.length === 0 ? (
+            <p className="message-empty">No pinned messages yet.</p>
+          ) : (
+            <div className="pinned-list">
+              {pinnedMessages.map((item) => (
+                <button
+                  key={item._id}
+                  type="button"
+                  className="pinned-card"
+                  onClick={() => {
+                    scrollToMessage(item._id);
+                    setPinnedDrawerOpen(false);
+                  }}
+                >
+                  <div className="message-meta">
+                    <span>{item.senderName}</span>
+                    <span>{item.time}</span>
+                  </div>
+                  <p>{item.message}</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </aside>
+      )}
 
       {contextMenu && (
         <div
@@ -596,61 +745,6 @@ export default function ChatClient({ roomId }) {
           )}
         </div>
       )}
-
-      {onlineUsers.length > 0 && (
-        <div className="online-users-wrap">
-          <p className="online-users-label">Active in this room</p>
-          <div className="online-users-list">
-            {onlineUsers.map((user) => (
-              <span key={`${user.id}-${user.email}`} className="online-user-pill">
-                {user.name}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div className="composer">
-        {replyDraft && (
-          <div className="reply-quote reply-quote-composer">
-            <div className="reply-preview-head">
-              <span className="reply-quote-label">Replying to {replyDraft.senderName}</span>
-              <button
-                type="button"
-                className="reply-preview-close"
-                onClick={() => setReplyDraft(null)}
-                aria-label="Cancel reply"
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="reply-quote-body">
-              <span className="reply-quote-bar" aria-hidden="true" />
-              <div className="reply-quote-content">
-                <span className="reply-quote-name">{replyDraft.senderName}</span>
-                <p>{replyDraft.message}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <input
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              sendMessage();
-            }
-          }}
-          placeholder="Type a message..."
-        />
-
-        <button className="primary-btn" onClick={sendMessage}>
-          Send
-        </button>
-      </div>
     </div>
   );
 }

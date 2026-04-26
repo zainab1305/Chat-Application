@@ -30,10 +30,10 @@ export default async function RoomLayout({ children, params }) {
           <div>
             <p className="dashboard-kicker">Room</p>
             <h1>{room.name}</h1>
-            <p>Code: {room.code}</p>
+            <p className="room-header-code">Room Code: {room.code}</p>
           </div>
 
-          <RoomActions roomId={roomId} isOwner={isOwner} />
+          <RoomActions roomId={roomId} roomCode={room.code} isOwner={isOwner} />
         </div>
 
         <RoomNav roomId={roomId} />
