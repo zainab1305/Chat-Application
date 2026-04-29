@@ -139,14 +139,21 @@ export default function DashboardClient() {
 
   const myTasks = useMemo(() => {
     const userId = String(session?.user?.id || "");
+    const userEmail = String(session?.user?.email || "").toLowerCase();
 
     return rooms
       .flatMap((room) => {
         const tasks = roomInsights[room._id]?.tasks || [];
         return tasks
           .filter((task) => {
-            const assigned = String(task?.assignedTo?._id || task?.assignedTo || "");
-            return assigned && assigned === userId;
+            const assignedId = String(task?.assignedTo?._id || task?.assignedTo || "");
+            const assignedEmail = String(task?.assignedTo?.email || "").toLowerCase();
+
+            if (userEmail && assignedEmail) {
+              return assignedEmail === userEmail;
+            }
+
+            return Boolean(userId && assignedId && assignedId === userId);
           })
           .map((task) => ({ ...task, roomId: room._id, roomName: room.name }));
       })
