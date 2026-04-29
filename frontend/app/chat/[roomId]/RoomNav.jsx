@@ -14,8 +14,8 @@ export default function RoomNav({ roomId }) {
   ];
 
   return (
-    <div className="room-tabs-wrap">
-      <nav className="room-tabs" aria-label="Room navigation">
+    <div className="px-6 border-t border-slate-100">
+      <nav className="flex items-center gap-8" aria-label="Room navigation">
         {tabs.map((tab) => {
           const isActive = pathname === tab.href;
 
@@ -23,7 +23,11 @@ export default function RoomNav({ roomId }) {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`room-tab ${isActive ? "active" : ""}`}
+              className={`px-1 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+                isActive
+                  ? "text-slate-900 border-slate-900"
+                  : "text-slate-600 border-transparent hover:text-slate-900"
+              }`}
               aria-current={isActive ? "page" : undefined}
             >
               {tab.label}

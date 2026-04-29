@@ -245,7 +245,36 @@ export default function TasksClient({ roomId }) {
     }
   };
 
-  if (loading) return <p>Loading tasks...</p>;
+  if (loading) {
+    return (
+      <div className="workspace-section trello-board-shell workspace-loading" aria-label="Loading tasks">
+        <div className="workspace-loading-header">
+          <div className="workspace-loading-line medium" />
+          <div className="workspace-loading-line short" />
+        </div>
+
+        <div className="trello-board-grid workspace-loading-grid">
+          {STATUS_ORDER.map((status) => (
+            <section key={status} className="trello-column workspace-loading-column">
+              <div className="workspace-loading-row">
+                <div className="workspace-loading-chip" />
+                <div className="workspace-loading-line medium" />
+                <div className="workspace-loading-action" />
+              </div>
+              <div className="workspace-loading-card">
+                <div className="workspace-loading-line" />
+                <div className="workspace-loading-line short" />
+              </div>
+              <div className="workspace-loading-card">
+                <div className="workspace-loading-line medium" />
+                <div className="workspace-loading-line short" />
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="workspace-section trello-board-shell">

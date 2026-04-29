@@ -2,7 +2,7 @@
 
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import NotificationBell from "@/components/NotificationBell";
 
 export default function RoomActions({ roomId, roomCode, isOwner }) {
@@ -10,7 +10,22 @@ export default function RoomActions({ roomId, roomCode, isOwner }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [copiedInvite, setCopiedInvite] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    }
+
+    if (isDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isDropdownOpen]);
 
   function showToast(message) {
     setToast(message);
@@ -24,6 +39,7 @@ export default function RoomActions({ roomId, roomCode, isOwner }) {
       setCopiedCode(true);
       window.setTimeout(() => setCopiedCode(false), 1400);
       showToast("Room code copied");
+      setIsDropdownOpen(false);
     } catch {
       window.alert("Unable to copy room code");
     }
@@ -36,6 +52,7 @@ export default function RoomActions({ roomId, roomCode, isOwner }) {
       setCopiedInvite(true);
       window.setTimeout(() => setCopiedInvite(false), 1400);
       showToast("Invite link copied");
+      setIsDropdownOpen(false);
     } catch {
       window.alert("Unable to copy invite link");
     }
@@ -69,42 +86,111 @@ export default function RoomActions({ roomId, roomCode, isOwner }) {
     }
   };
 
+  const goToDashboard = () => {
+    setIsDropdownOpen(false);
+    router.push("/dashboard");
+  };
+
+  const handleLogout = () => {
+    setIsDropdownOpen(false);
+    signOut({ callbackUrl: "/login" });
+  };
+
   return (
-    <div className="chat-header-actions room-header-actions">
+    <div className="flex items-center gap-2">
       <NotificationBell />
-      <button type="button" className="ghost-btn room-icon-btn" onClick={copyRoomCode}>
-        {copiedCode ? "Copied" : "Copy Code"}
+
+      {/* Invite Button */}
+      <button
+        type="button"
+        onClick={copyInviteLink}
+        className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+      >
+        {copiedInvite ? "✓ Invite Copied" : "Invite"}
       </button>
-      <button type="button" className="secondary-btn" onClick={copyInviteLink}>
-        {copiedInvite ? "Invite Copied" : "Invite"}
-      </button>
-      {isOwner && (
+
+      {/* Dropdown Menu */}
+      <div className="relative" ref={dropdownRef}>
         <button
           type="button"
-          className="ghost-btn room-icon-btn"
-          onClick={() => router.push(`/chat/${roomId}/members`)}
-          aria-label="Room settings"
-          title="Room settings"
+          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+          className="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+          aria-label="More options"
         >
-          Manage
+          <svg
+            className="w-5 h-5"
+            fill="currentColor"
+            viewBox="0 0 20 20"
+          >
+            <path d="M10.5 1.5H9.5V3.5H10.5V1.5ZM10.5 8.5H9.5V10.5H10.5V8.5ZM10.5 15.5H9.5V17.5H10.5V15.5Z" />
+          </svg>
         </button>
-      )}
-      <button className="ghost-btn" onClick={() => router.push("/dashboard")}>
-        Dashboard
-      </button>
-      {isOwner && (
-        <button className="danger-btn" onClick={handleDelete} disabled={isDeleting}>
-          {isDeleting ? "Deleting..." : "Delete Room"}
-        </button>
-      )}
-      <button className="ghost-btn" onClick={() => signOut({ callbackUrl: "/login" })}>
-        Logout
-      </button>
-      {toast ? (
-        <div className="app-toast app-toast-success room-header-toast" role="status">
+
+        {/* Dropdown Menu */}
+        {isDropdownOpen && (
+          <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-50">
+            <div className="py-1">
+              <button
+                type="button"
+                onClick={copyRoomCode}
+                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                {copiedCode ? "✓ Room Code Copied" : "Copy Room Code"}
+              </button>
+
+              <div className="border-t border-slate-100 my-1" />
+
+              <button
+                type="button"
+                onClick={goToDashboard}
+                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Go to Dashboard
+              </button>
+
+              {isOwner && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      router.push(`/chat/${roomId}/members`);
+                      setIsDropdownOpen(false);
+                    }}
+                    className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    Manage Room
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                  >
+                    {isDeleting ? "Deleting..." : "Delete Room"}
+                  </button>
+                </>
+              )}
+
+              <div className="border-t border-slate-100 my-1" />
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-semibold animate-pulse z-50">
           {toast}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

@@ -20,8 +20,7 @@ export default function ChatClient({ roomId, roomCode }) {
   const [loadError, setLoadError] = useState("");
   const [sendError, setSendError] = useState("");
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
-  const [pinnedPreviewOpen, setPinnedPreviewOpen] = useState(true);
-  const [pinnedDrawerOpen, setPinnedDrawerOpen] = useState(false);
+  const [pinnedOpen, setPinnedOpen] = useState(false);
   const [copiedInviteCode, setCopiedInviteCode] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [toast, setToast] = useState(null);
@@ -237,7 +236,7 @@ export default function ChatClient({ roomId, roomCode }) {
         body: JSON.stringify({ roomId }),
       });
     } catch {
-      // Best-effort sync; unread endpoint will still compute from latest successful write.
+      // Best-effort sync
     }
   }, [roomId, session?.user]);
 
@@ -449,191 +448,219 @@ export default function ChatClient({ roomId, roomCode }) {
 
   if (loading) {
     return (
-      <div className="room-chat-layout chat-loading-layout" aria-label="Loading room">
-        <section className="room-chat-main">
-          <div className="chat-loading-stack">
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="chat-skeleton-message">
-                <div className="skeleton-line skeleton-line-title" />
-                <div className="skeleton-line skeleton-line-text" />
-                <div className="skeleton-line skeleton-line-text short" />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <aside className="chat-context-sidebar">
-          <div className="chat-context-card chat-skeleton-card">
-            <div className="skeleton-line skeleton-line-title" />
-            <div className="skeleton-line skeleton-line-text" />
-            <div className="skeleton-line skeleton-line-button" />
-          </div>
-          <div className="chat-context-card chat-skeleton-card">
-            <div className="skeleton-line skeleton-line-title" />
-            <div className="skeleton-line skeleton-line-text" />
-            <div className="skeleton-line skeleton-line-button" />
-          </div>
-        </aside>
+      <div className="flex h-full gap-4 p-4 bg-white/50">
+        <div className="flex-1 flex flex-col gap-3">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-16 bg-slate-200 rounded-lg animate-pulse" />
+          ))}
+        </div>
+        <div className="w-72 space-y-4">
+          <div className="h-32 bg-slate-200 rounded-lg animate-pulse" />
+          <div className="h-32 bg-slate-200 rounded-lg animate-pulse" />
+        </div>
       </div>
     );
   }
 
   if (loadError) {
     return (
-      <div>
-        <p className="error-banner">{loadError}</p>
-        <button className="ghost-btn" onClick={() => router.push("/dashboard")}>
-          Back to Dashboard
-        </button>
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{loadError}</p>
+          <button 
+            onClick={() => router.push("/dashboard")}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Back to Dashboard
+          </button>
+        </div>
       </div>
     );
   }
 
-
   return (
     <div
-      className="room-chat-layout"
+      className="flex h-full bg-white overflow-hidden"
       onClick={() => setContextMenu(null)}
       onContextMenuCapture={() => setContextMenu(null)}
     >
-      {sendError && <p className="error-banner">{sendError}</p>}
-
-      <section className="room-chat-main">
-        <div className="chat-collapsible-row">
-          <button
-            type="button"
-            className={`ghost-btn room-filter-btn ${announcementsOpen ? "active" : ""}`}
-            onClick={() => setAnnouncementsOpen((current) => !current)}
-          >
-            Announcements <span className="room-filter-count">{announcements.length}</span>
-          </button>
-          <button
-            type="button"
-            className={`ghost-btn room-filter-btn ${pinnedPreviewOpen ? "active" : ""}`}
-            onClick={() => setPinnedPreviewOpen((current) => !current)}
-          >
-            Pinned <span className="room-filter-count">{pinnedMessages.length}</span>
-          </button>
-        </div>
-
-        {announcementsOpen && (
-          <section className="notification-panel">
-            <div className="notification-panel-head">
-              <div>
-                <p className="dashboard-kicker">Announcements</p>
-                <h2>Announcements</h2>
-              </div>
-            </div>
-
-            <div className="notification-panel-body">
-              {canManageMessages && (
-                <div className="notification-compose">
-                  <textarea
-                    value={announcementText}
-                    onChange={(e) => setAnnouncementText(e.target.value)}
-                    placeholder="Post an announcement for the room..."
-                    rows={3}
-                  />
-                  <button className="secondary-btn" onClick={postAnnouncement}>
-                    Post Announcement
-                  </button>
-                </div>
-              )}
-
-              {announcements.length === 0 ? (
-                <p className="message-empty">No announcements yet.</p>
-              ) : (
-                <div className="announcement-feed">
-                  {announcements.slice(0, 3).map((item) => (
-                    <article key={item._id} className="announcement-feed-item">
-                      <div className="announcement-feed-meta">
-                        <span>{item.senderName}</span>
-                        <span>{item.time}</span>
-                      </div>
-                      <p>{item.message}</p>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
+      {/* Main chat area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Top toolbar with filters */}
+        {(announcements.length > 0 || pinnedMessages.length > 0) && (
+          <div className="border-b border-slate-200 px-6 py-3 flex gap-3">
+            {announcements.length > 0 && (
+              <button
+                onClick={() => setAnnouncementsOpen(!announcementsOpen)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  announcementsOpen
+                    ? "bg-blue-100 text-blue-700"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                📢 Announcements ({announcements.length})
+              </button>
+            )}
+            {pinnedMessages.length > 0 && (
+              <button
+                onClick={() => setPinnedOpen(!pinnedOpen)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  pinnedOpen
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                📌 Pinned ({pinnedMessages.length})
+              </button>
+            )}
+          </div>
         )}
 
-        {pinnedPreviewOpen && (
-          <section className="pinned-section pinned-preview-panel">
-            <div className="pinned-section-head">
-              <h2>Pinned ({pinnedMessages.length})</h2>
+        {/* Announcements Panel */}
+        {announcementsOpen && announcements.length > 0 && (
+          <div className="border-b border-slate-200 bg-blue-50 p-4 max-h-48 overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-slate-900">Announcements</h3>
               <button
-                type="button"
-                className="ghost-btn"
-                onClick={() => setPinnedDrawerOpen(true)}
-                disabled={pinnedMessages.length === 0}
+                onClick={() => setAnnouncementsOpen(false)}
+                className="text-slate-500 hover:text-slate-700"
               >
-                Open Drawer
+                ✕
               </button>
             </div>
-
-            {pinnedMessages.length === 0 ? (
-              <p className="message-empty pinned-empty">No pinned messages yet.</p>
-            ) : (
-              <div className="pinned-list">
-                {pinnedMessages.slice(0, 2).map((item) => (
-                  <button
-                    key={item._id}
-                    type="button"
-                    className="pinned-card"
-                    onClick={() => {
-                      scrollToMessage(item._id);
-                      setPinnedDrawerOpen(true);
-                    }}
-                  >
-                    <div className="message-meta">
-                      <span>{item.senderName}</span>
-                      <span>{item.time}</span>
-                    </div>
-                    <p>{item.message}</p>
-                  </button>
-                ))}
+            {canManageMessages && (
+              <div className="mb-3 pb-3 border-b border-blue-200">
+                <textarea
+                  value={announcementText}
+                  onChange={(e) => setAnnouncementText(e.target.value)}
+                  placeholder="Post an announcement..."
+                  rows={2}
+                  className="w-full p-2 text-sm border border-blue-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  onClick={postAnnouncement}
+                  className="mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                >
+                  Post
+                </button>
               </div>
             )}
-          </section>
+            <div className="space-y-2">
+              {announcements.slice(0, 5).map((item) => (
+                <div key={item._id} className="bg-white p-2 rounded text-sm border-l-2 border-blue-400">
+                  <div className="flex justify-between text-xs text-slate-600">
+                    <span className="font-medium">{item.senderName}</span>
+                    <span>{item.time}</span>
+                  </div>
+                  <p className="text-slate-800 mt-1">{item.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
 
-        <div className="message-board chat-message-board" ref={messageBoardRef}>
+        {/* Pinned Messages Panel */}
+        {pinnedOpen && pinnedMessages.length > 0 && (
+          <div className="border-b border-slate-200 bg-amber-50 p-4 max-h-48 overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-slate-900">Pinned Messages</h3>
+              <button
+                onClick={() => setPinnedOpen(false)}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-2">
+              {pinnedMessages.map((item) => (
+                <button
+                  key={item._id}
+                  onClick={() => scrollToMessage(item._id)}
+                  className="w-full bg-white p-2 rounded text-sm border-l-2 border-amber-400 hover:bg-amber-100 transition-colors text-left"
+                >
+                  <div className="flex justify-between text-xs text-slate-600">
+                    <span className="font-medium">{item.senderName}</span>
+                    <span>{item.time}</span>
+                  </div>
+                  <p className="text-slate-800 mt-1 truncate">{item.message}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Messages Area */}
+        <div 
+          ref={messageBoardRef}
+          className="flex-1 overflow-y-auto px-6 py-4 space-y-4"
+        >
           {messages.length === 0 ? (
-            <p className="message-empty">No messages yet. Start the conversation.</p>
+            <div className="h-full flex items-center justify-center">
+              <p className="text-slate-500 text-center">
+                No messages yet. Start the conversation! 💬
+              </p>
+            </div>
           ) : (
             messages.map((msg, i) => {
               const isMe = msg.senderName === currentUserLabel;
-              const isReply = Boolean(msg.replyTo?.senderName && msg.replyTo?.message);
+              const isAnnouncement = msg.type === "announcement";
 
               return (
                 <div
                   id={`message-${msg._id}`}
                   key={`${msg._id || i}-${msg.time}`}
-                  className={`message-item ${msg.type === "announcement" ? "announcement-message" : ""} ${isMe ? "mine" : ""} ${isReply ? "reply-message-theme" : ""}`}
+                  className={`flex items-end gap-3 ${isMe ? "flex-row-reverse" : ""}`}
                   onContextMenu={(event) => openContextMenu(event, msg)}
                 >
-                  <p className="message-sender">{isMe ? "You" : msg.senderName}</p>
+                  {/* Avatar placeholder */}
+                  <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold ${
+                    isMe 
+                      ? "bg-blue-500 text-white ring-4 ring-slate-100" 
+                      : isAnnouncement 
+                      ? "bg-purple-500 text-white ring-4 ring-purple-50" 
+                      : "bg-slate-300 text-slate-700 ring-4 ring-slate-50"
+                  }`}>
+                    {msg.senderName.charAt(0).toUpperCase()}
+                  </div>
 
-                  {msg.replyTo?.senderName && msg.replyTo?.message && (
-                    <div className="reply-quote reply-quote-inline">
-                      <span className="reply-quote-label">Replying to {msg.replyTo.senderName}</span>
-                      <div className="reply-quote-body">
-                        <span className="reply-quote-bar" aria-hidden="true" />
-                        <div className="reply-quote-content">
-                          <span className="reply-quote-name">{msg.replyTo.senderName}</span>
-                          <p>{msg.replyTo.message}</p>
-                        </div>
-                      </div>
+                  {/* Message bubble */}
+                  <div className={`flex-1 max-w-md ${isMe ? "text-right" : ""}`}>
+                    <div className="flex items-center gap-2" style={{ justifyContent: isMe ? "flex-end" : "flex-start" }}>
+                      <span className={`text-sm font-semibold ${isMe ? "text-slate-700" : "text-slate-900"}`}>
+                        {isMe ? "You" : msg.senderName}
+                      </span>
+                      <span className={`text-xs ${isMe ? "text-slate-500" : "text-slate-500"}`}>{msg.time}</span>
+                      {msg.isPinned && <span className={`${isMe ? "text-slate-400" : "text-amber-600"} text-xs`}>📌</span>}
                     </div>
-                  )}
 
-                  <p className="message-body">{msg.message}</p>
-                  <p className="message-time-small">
-                    {msg.type === "announcement" ? "Announcement" : msg.time}
-                    {msg.isPinned ? " • Pinned" : ""}
-                  </p>
+                    {/* Reply quote if present */}
+                    {msg.replyTo?.senderName && msg.replyTo?.message && (
+                      <div className={`mt-1.5 p-2 rounded border-l-2 border-slate-300 bg-slate-50 text-sm ${
+                        isMe ? "text-right" : ""
+                      }`}>
+                        <p className="text-xs text-slate-600 font-medium">
+                          ↳ {msg.replyTo.senderName}
+                        </p>
+                        <p className="text-slate-700 truncate">{msg.replyTo.message}</p>
+                      </div>
+                    )}
+
+                    {/* Main message */}
+                    <div className={`mt-1 px-4 py-2.5 rounded-2xl shadow-sm ${
+                      isMe
+                        ? "bg-gradient-to-br from-blue-500 to-blue-600"
+                        : isAnnouncement
+                        ? "bg-purple-100 text-purple-900 font-medium"
+                        : "bg-slate-100 text-slate-900"
+                    }`}>
+                      <p
+                        className={`break-words whitespace-pre-wrap font-medium ${isMe ? "text-white" : "text-inherit"}`}
+                        style={isMe ? { color: "#ffffff" } : undefined}
+                      >
+                        {msg.message}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               );
             })
@@ -641,174 +668,158 @@ export default function ChatClient({ roomId, roomCode }) {
           <div ref={endOfMessagesRef} />
         </div>
 
-        <div className="composer chat-composer-sticky">
-          {replyDraft && (
-            <div className="reply-quote reply-quote-composer">
-              <div className="reply-preview-head">
-                <span className="reply-quote-label">Replying to {replyDraft.senderName}</span>
-                <button
-                  type="button"
-                  className="reply-preview-close"
-                  onClick={() => setReplyDraft(null)}
-                  aria-label="Cancel reply"
-                >
-                  ×
-                </button>
+        {/* Reply Draft */}
+        {replyDraft && (
+          <div className="border-t border-slate-200 bg-blue-50 px-6 py-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm">
+                <p className="text-xs text-blue-700 font-medium">Replying to {replyDraft.senderName}</p>
+                <p className="text-slate-600 truncate">{replyDraft.message}</p>
               </div>
+              <button
+                onClick={() => setReplyDraft(null)}
+                className="ml-2 text-blue-600 hover:text-blue-800 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
 
-              <div className="reply-quote-body">
-                <span className="reply-quote-bar" aria-hidden="true" />
-                <div className="reply-quote-content">
-                  <span className="reply-quote-name">{replyDraft.senderName}</span>
-                  <p>{replyDraft.message}</p>
-                </div>
-              </div>
+        {/* Input Area */}
+        <div className="border-t border-slate-200 bg-white p-4">
+          {sendError && (
+            <div className="mb-2 p-2 bg-red-50 text-red-700 text-sm rounded">
+              {sendError}
             </div>
           )}
-
-          <div className="chat-input-row">
+          <div className="flex gap-2">
             <input
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   sendMessage();
                 }
               }}
-              placeholder="Type a message..."
+              placeholder="Type a message... (Enter to send)"
+              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <button className="primary-btn" onClick={sendMessage}>
+            <button 
+              onClick={sendMessage}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
               Send
             </button>
           </div>
         </div>
-      </section>
+      </div>
 
-      <aside className="chat-context-sidebar">
-        <div className="chat-context-card">
-          <p className="dashboard-kicker">Active now</p>
-          <h3>{onlineUsers.length} online</h3>
-          <p className="chat-context-sub">Live member presence in this room</p>
-
+      {/* Right Sidebar */}
+      <div className="w-72 border-l border-slate-200 flex flex-col overflow-hidden">
+        {/* Online Members */}
+        <div className="flex-1 overflow-y-auto p-4 border-b border-slate-200">
+          <h3 className="text-sm font-semibold text-slate-900 mb-3">
+            Active Now ({onlineUsers.length})
+          </h3>
+          <p className="text-xs text-slate-600 mb-3">Live member presence</p>
+          
           {onlineUsers.length > 0 ? (
-            <div className="online-users-list chat-context-users">
+            <div className="space-y-2">
               {onlineUsers.map((user) => (
-                <span key={`${user.id}-${user.email}`} className="online-user-pill">
-                  {user.name}
-                </span>
+                <div
+                  key={`${user.id}-${user.email}`}
+                  className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-xs font-bold text-white">
+                    {user.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-900 truncate">{user.name}</p>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="text-xs text-green-600">Online</span>
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
-            <p className="chat-context-sub">No one is online right now.</p>
+            <p className="text-sm text-slate-600">No one online right now</p>
           )}
         </div>
 
-        <div className="chat-context-card">
-          <p className="dashboard-kicker">Invite code</p>
-          <h3>{roomCode}</h3>
-          <button type="button" className="secondary-btn" onClick={copyInviteCode}>
-            {copiedInviteCode ? "Copied" : "Copy Code"}
-          </button>
-        </div>
-      </aside>
-
-      {pinnedDrawerOpen && (
-        <aside className="pinned-drawer" onClick={(event) => event.stopPropagation()}>
-          <div className="pinned-drawer-head">
-            <h3>Pinned ({pinnedMessages.length})</h3>
-            <button type="button" className="ghost-btn" onClick={() => setPinnedDrawerOpen(false)}>
-              Close
+        {/* Invite Code */}
+        <div className="p-4">
+          <h3 className="text-sm font-semibold text-slate-900 mb-2">Invite Code</h3>
+          <div className="flex items-center gap-2 p-3 bg-slate-100 rounded-lg border border-slate-300">
+            <code className="flex-1 font-mono text-sm font-bold text-slate-700">{roomCode}</code>
+            <button
+              onClick={copyInviteCode}
+              className="px-2 py-1 bg-white hover:bg-slate-200 rounded text-xs font-medium transition-colors"
+            >
+              {copiedInviteCode ? "✓" : "Copy"}
             </button>
           </div>
+        </div>
+      </div>
 
-          {pinnedMessages.length === 0 ? (
-            <p className="message-empty">No pinned messages yet.</p>
-          ) : (
-            <div className="pinned-list">
-              {pinnedMessages.map((item) => (
-                <button
-                  key={item._id}
-                  type="button"
-                  className="pinned-card"
-                  onClick={() => {
-                    scrollToMessage(item._id);
-                    setPinnedDrawerOpen(false);
-                  }}
-                >
-                  <div className="message-meta">
-                    <span>{item.senderName}</span>
-                    <span>{item.time}</span>
-                  </div>
-                  <p>{item.message}</p>
-                </button>
-              ))}
-            </div>
-          )}
-        </aside>
-      )}
-
+      {/* Context Menu */}
       {contextMenu && (
         <div
-          className="message-context-menu"
-          style={{ left: contextMenu.x, top: contextMenu.y }}
+          className="fixed bg-white rounded-lg shadow-xl border border-slate-200 z-50"
+          style={{
+            left: `${Math.min(contextMenu.x, window.innerWidth - 180)}px`,
+            top: `${Math.min(contextMenu.y, window.innerHeight - 200)}px`,
+          }}
           onClick={(event) => event.stopPropagation()}
         >
           <button
-            type="button"
-            className="menu-item"
-            onClick={() =>
-              replyToMessage({
-                _id: contextMenu.messageId,
-                senderId: contextMenu.senderId,
-                senderName: contextMenu.senderName,
-                message: contextMenu.text,
-              })
-            }
+            onClick={() => replyToMessage({
+              _id: contextMenu.messageId,
+              senderId: contextMenu.senderId,
+              senderName: contextMenu.senderName,
+              message: contextMenu.text,
+            })}
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 first:rounded-t-lg"
           >
-            <span className="menu-icon" aria-hidden="true">↩</span>
-            <span>Reply</span>
+            ↩ Reply
           </button>
-
           <button
-            type="button"
-            className="menu-item"
             onClick={() => copyMessageText(contextMenu.text)}
+            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
           >
-            <span className="menu-icon" aria-hidden="true">⧉</span>
-            <span>Copy</span>
+            ⧉ Copy
           </button>
-
           {canManageMessages && (
             <>
-              <div className="menu-separator" />
+              <div className="border-t border-slate-200" />
               <button
-                type="button"
-                className="menu-item"
                 onClick={() => togglePin(contextMenu.messageId)}
+                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
               >
-                <span className="menu-icon" aria-hidden="true">📌</span>
-                <span>{contextMenu.isPinned ? "Unpin" : "Pin"}</span>
+                📌 {contextMenu.isPinned ? "Unpin" : "Pin"}
               </button>
-              <div className="menu-separator" />
               <button
-                type="button"
-                className="menu-item danger-btn"
                 onClick={() => deleteMessage(contextMenu.messageId)}
+                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 last:rounded-b-lg"
               >
-                <span className="menu-icon" aria-hidden="true">🗑</span>
-                <span>Delete</span>
+                🗑 Delete
               </button>
             </>
           )}
         </div>
       )}
 
-      {toast ? (
-        <div className={`app-toast ${toast.type === "error" ? "app-toast-error" : "app-toast-success"}`} role="status">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg text-white text-sm font-medium z-50 animate-pulse ${
+          toast.type === "error" ? "bg-red-500" : "bg-green-500"
+        }`}>
           {toast.message}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

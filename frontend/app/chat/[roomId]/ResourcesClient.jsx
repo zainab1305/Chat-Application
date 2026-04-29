@@ -101,7 +101,39 @@ export default function ResourcesClient({ roomId }) {
     }
   };
 
-  if (loading) return <p>Loading resources...</p>;
+  if (loading) {
+    return (
+      <div className="workspace-section workspace-loading" aria-label="Loading resources">
+        <div className="workspace-loading-header">
+          <div className="workspace-loading-line medium" />
+          <div className="workspace-loading-line short" />
+        </div>
+
+        <div className="workspace-loading-card workspace-loading-header">
+          <div className="workspace-loading-line medium" />
+          <div className="workspace-loading-line" />
+          <div className="workspace-loading-row">
+            <div className="workspace-loading-chip" />
+            <div className="workspace-loading-line medium" />
+            <div className="workspace-loading-action" />
+          </div>
+        </div>
+
+        <div className="workspace-loading-grid">
+          <div className="workspace-loading-card workspace-loading-header">
+            <div className="workspace-loading-line medium" />
+            <div className="workspace-loading-line short" />
+            <div className="workspace-loading-action" />
+          </div>
+          <div className="workspace-loading-card workspace-loading-header">
+            <div className="workspace-loading-line medium" />
+            <div className="workspace-loading-line short" />
+            <div className="workspace-loading-action" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="workspace-section">
