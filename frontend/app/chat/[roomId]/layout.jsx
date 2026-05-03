@@ -4,7 +4,11 @@ import { redirect } from "next/navigation";
 import RoomNav from "./RoomNav";
 import RoomActions from "./RoomActions";
 import RoomPresence from "./RoomPresence";
+import LeftSidebar from "./LeftSidebar";
+import RightSidebar from "./RightSidebar";
 import { getRoomAccess } from "@/lib/roomRoles";
+import { connectDB } from "@/lib/db";
+import User from "@/models/User";
 
 export default async function RoomLayout({ children, params }) {
   const session = await getServerSession(authOptions);
@@ -24,37 +28,68 @@ export default async function RoomLayout({ children, params }) {
   const room = access.room;
   const isOwner = access.isAdmin;
 
+  // Fetch creator name for the right sidebar
+  let creatorName = "";
+  try {
+    await connectDB();
+    if (room.createdBy) {
+      const creator = await User.findById(room.createdBy).select("name email").lean();
+      creatorName = creator?.name || creator?.email || "";
+    }
+  } catch {
+    // non-critical
+  }
+
+  const memberCount = Array.isArray(room.members) ? room.members.length : 0;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100">
+    <div className="rl-root">
       <RoomPresence roomId={roomId} />
-      
-      {/* Modern workspace layout */}
-      <div className="flex flex-col h-screen max-w-full">
-        {/* Header */}
-        <div className="border-b border-slate-200 bg-white/80 backdrop-blur-sm sticky top-0 z-40 shadow-sm">
-          <div className="px-6 py-4 flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3">
-                <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Room</p>
-                  <h1 className="text-2xl font-bold text-slate-900 truncate">{room.name}</h1>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200">
-                  <code className="text-xs font-mono text-slate-600">{room.code}</code>
-                </div>
+
+      {/* ── Full-height flex container ── */}
+      <div className="rl-shell">
+
+        {/* ── Left Sidebar ── */}
+        <LeftSidebar
+          workspaceId={roomId}
+          workspaceName={room.name}
+          workspaceCode={room.code}
+          isOwner={isOwner}
+          currentUserId={session.user.id || ""}
+          currentUserName={session.user.name || session.user.email || ""}
+        />
+
+        {/* ── Centre column ── */}
+        <div className="rl-centre">
+          {/* Header */}
+          <div className="rl-header">
+            <div className="rl-header-left">
+              <p className="rl-header-kicker">Room</p>
+              <h1 className="rl-header-title">{room.name}</h1>
+              <div className="rl-header-code">
+                <code>{room.code}</code>
               </div>
             </div>
             <RoomActions roomId={roomId} roomCode={room.code} isOwner={isOwner} />
           </div>
 
-          {/* Tabs Navigation */}
+          {/* Tab navigation */}
           <RoomNav roomId={roomId} />
+
+          {/* Page content */}
+          <div className="rl-content">
+            {children}
+          </div>
         </div>
 
-        {/* Main content area - full height */}
-        <div className="flex-1 overflow-hidden">
-          {children}
-        </div>
+        {/* ── Right Sidebar ── */}
+        <RightSidebar
+          roomId={roomId}
+          roomCode={room.code}
+          creatorName={creatorName}
+          createdAt={room.createdAt}
+          memberCount={memberCount}
+        />
       </div>
     </div>
   );

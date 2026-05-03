@@ -3,16 +3,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { socket } from "@/lib/socket";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function ChatClient({ roomId, roomCode }) {
+export default function ChatClient({ roomId, roomCode, roomName }) {
   const { data: session } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // The active channel — read from URL query param
+  const channelId = searchParams.get("channel") || "";
 
   const [message, setMessage] = useState("");
   const [announcementText, setAnnouncementText] = useState("");
   const [messages, setMessages] = useState([]);
-  const [onlineUsers, setOnlineUsers] = useState([]);
   const [canManageMessages, setCanManageMessages] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
   const [replyDraft, setReplyDraft] = useState(null);
@@ -21,14 +24,14 @@ export default function ChatClient({ roomId, roomCode }) {
   const [sendError, setSendError] = useState("");
   const [announcementsOpen, setAnnouncementsOpen] = useState(false);
   const [pinnedOpen, setPinnedOpen] = useState(false);
-  const [copiedInviteCode, setCopiedInviteCode] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [toast, setToast] = useState(null);
+  const [channelName, setChannelName] = useState("");
   const endOfMessagesRef = useRef(null);
   const messageBoardRef = useRef(null);
 
-  function showToast(message, type = "success") {
-    setToast({ message, type });
+  function showToast(msg, type = "success") {
+    setToast({ message: msg, type });
     window.clearTimeout(showToast.timeoutId);
     showToast.timeoutId = window.setTimeout(() => setToast(null), 2200);
   }
@@ -36,21 +39,17 @@ export default function ChatClient({ roomId, roomCode }) {
   const pinnedMessages = useMemo(() => {
     return [...messages]
       .filter((item) => item.isPinned)
-      .sort((left, right) => {
-        const leftTime = new Date(left.pinnedAt || left.createdAt || 0).getTime();
-        const rightTime = new Date(right.pinnedAt || right.createdAt || 0).getTime();
-        return rightTime - leftTime;
+      .sort((l, r) => {
+        const lt = new Date(l.pinnedAt || l.createdAt || 0).getTime();
+        const rt = new Date(r.pinnedAt || r.createdAt || 0).getTime();
+        return rt - lt;
       });
   }, [messages]);
 
   const announcements = useMemo(() => {
     return [...messages]
       .filter((item) => item.type === "announcement")
-      .sort((left, right) => {
-        const leftTime = new Date(left.createdAt || 0).getTime();
-        const rightTime = new Date(right.createdAt || 0).getTime();
-        return rightTime - leftTime;
-      });
+      .sort((l, r) => new Date(r.createdAt || 0) - new Date(l.createdAt || 0));
   }, [messages]);
 
   const currentUserLabel = useMemo(
@@ -60,31 +59,21 @@ export default function ChatClient({ roomId, roomCode }) {
 
   const upsertMessage = (incoming) => {
     if (!incoming?._id) return;
-
     setMessages((current) => {
-      const existingIndex = current.findIndex((item) => item._id === incoming._id);
-
-      if (existingIndex < 0) {
-        return [...current, incoming];
-      }
-
+      const idx = current.findIndex((item) => item._id === incoming._id);
+      if (idx < 0) return [...current, incoming];
       const next = [...current];
-      next[existingIndex] = { ...next[existingIndex], ...incoming };
+      next[idx] = { ...next[idx], ...incoming };
       return next;
     });
   };
 
   const updatePinnedMessage = (incoming) => {
     if (!incoming?.message?._id) return;
-
     setMessages((current) => {
       const next = [...current];
       const index = next.findIndex((item) => item._id === incoming.message._id);
-
-      if (index >= 0) {
-        next[index] = { ...next[index], ...incoming.message };
-      }
-
+      if (index >= 0) next[index] = { ...next[index], ...incoming.message };
       return next;
     });
   };
@@ -93,42 +82,45 @@ export default function ChatClient({ roomId, roomCode }) {
     setMessages((current) => current.filter((item) => item._id !== messageId));
   };
 
+  /* ─── Load messages whenever channelId changes ─── */
   useEffect(() => {
+    if (!channelId) {
+      // Wait for LeftSidebar to auto-select a channel
+      setLoading(false);
+      return;
+    }
+
     let isMounted = true;
 
     async function loadData() {
       setLoading(true);
       setLoadError("");
+      setMessages([]);
 
       try {
-        const [messagesRes, membersRes] = await Promise.all([
-          fetch(`/api/rooms/${roomId}/messages`, { cache: "no-store" }),
+        const [messagesRes, membersRes, channelsRes] = await Promise.all([
+          fetch(`/api/rooms/${roomId}/channels/${channelId}/messages`, { cache: "no-store" }),
           fetch(`/api/rooms/${roomId}/members`, { cache: "no-store" }),
+          fetch(`/api/rooms/${roomId}/channels`, { cache: "no-store" }),
         ]);
 
         const messagesData = await messagesRes.json();
         const membersData = await membersRes.json();
+        const channelsData = await channelsRes.json();
 
-        if (!messagesRes.ok) {
-          throw new Error(messagesData.error || "Failed to fetch messages");
-        }
-
-        if (!membersRes.ok) {
-          throw new Error(membersData.error || "Failed to fetch room info");
-        }
+        if (!messagesRes.ok) throw new Error(messagesData.error || "Failed to fetch messages");
+        if (!membersRes.ok) throw new Error(membersData.error || "Failed to fetch room info");
 
         if (isMounted) {
           setMessages(messagesData.messages || []);
           setCanManageMessages(Boolean(membersData.canManageMembers));
+          const ch = (channelsData.channels || []).find((c) => c._id === channelId);
+          if (ch) setChannelName(ch.name);
         }
       } catch (err) {
-        if (isMounted) {
-          setLoadError(err.message || "Unable to load room");
-        }
+        if (isMounted) setLoadError(err.message || "Unable to load channel");
       } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        if (isMounted) setLoading(false);
       }
     }
 
@@ -137,23 +129,19 @@ export default function ChatClient({ roomId, roomCode }) {
     return () => {
       isMounted = false;
     };
-  }, [roomId]);
+  }, [roomId, channelId]);
 
+  /* ─── Socket events ─── */
   useEffect(() => {
     if (!roomId || !session?.user) return;
 
-    if (!socket.connected) {
-      socket.connect();
-    }
+    if (!socket.connected) socket.connect();
 
     const onReceiveMessage = (data) => {
       if (data?.roomId !== roomId) return;
+      // Only show messages for the active channel
+      if (channelId && data?.channelId && String(data.channelId) !== channelId) return;
       upsertMessage(data);
-    };
-
-    const onRoomUsers = (payload) => {
-      if (payload?.roomId !== roomId) return;
-      setOnlineUsers(payload.users || []);
     };
 
     const onAnnouncementCreated = (data) => {
@@ -172,7 +160,6 @@ export default function ChatClient({ roomId, roomCode }) {
     };
 
     socket.on("receiveMessage", onReceiveMessage);
-    socket.on("roomUsers", onRoomUsers);
     socket.on("announcementCreated", onAnnouncementCreated);
     socket.on("messagePinned", onMessagePinned);
     socket.on("messageDeleted", onMessageDeleted);
@@ -187,48 +174,39 @@ export default function ChatClient({ roomId, roomCode }) {
           email: session.user.email,
         },
       },
-      (snapshot) => {
-        if (snapshot?.roomId === roomId) {
-          setOnlineUsers(snapshot.users || []);
-        }
-      }
+      () => {}
     );
 
     return () => {
       socket.off("receiveMessage", onReceiveMessage);
-      socket.off("roomUsers", onRoomUsers);
       socket.off("announcementCreated", onAnnouncementCreated);
       socket.off("messagePinned", onMessagePinned);
       socket.off("messageDeleted", onMessageDeleted);
     };
-  }, [roomId, session?.user]);
+  }, [roomId, channelId, session?.user]);
 
+  /* ─── Auto-scroll ─── */
   useEffect(() => {
     if (!isNearBottom) return;
-
     endOfMessagesRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [isNearBottom, messages]);
 
   useEffect(() => {
     const board = messageBoardRef.current;
     if (!board) return undefined;
-
     const threshold = 84;
-
-    const updatePosition = () => {
-      const distanceFromBottom = board.scrollHeight - board.scrollTop - board.clientHeight;
-      setIsNearBottom(distanceFromBottom <= threshold);
+    const update = () => {
+      const dist = board.scrollHeight - board.scrollTop - board.clientHeight;
+      setIsNearBottom(dist <= threshold);
     };
-
-    updatePosition();
-    board.addEventListener("scroll", updatePosition, { passive: true });
-
-    return () => board.removeEventListener("scroll", updatePosition);
+    update();
+    board.addEventListener("scroll", update, { passive: true });
+    return () => board.removeEventListener("scroll", update);
   }, []);
 
+  /* ─── Mark as seen ─── */
   const markRoomAsSeen = useCallback(async () => {
     if (!session?.user || !roomId) return;
-
     try {
       await fetch("/api/room/last-seen", {
         method: "PATCH",
@@ -236,24 +214,19 @@ export default function ChatClient({ roomId, roomCode }) {
         body: JSON.stringify({ roomId }),
       });
     } catch {
-      // Best-effort sync
+      // best-effort
     }
   }, [roomId, session?.user]);
 
   useEffect(() => {
     if (!session?.user || loading) return;
-
-    const timer = setTimeout(() => {
-      markRoomAsSeen();
-    }, 500);
-
+    const timer = setTimeout(() => markRoomAsSeen(), 500);
     return () => clearTimeout(timer);
   }, [loading, messages.length, markRoomAsSeen, session?.user]);
 
+  /* ─── Send message (channel-scoped) ─── */
   const sendMessage = async () => {
-    if (!session) return;
-
-    if (!message.trim()) return;
+    if (!session || !message.trim() || !channelId) return;
 
     setSendError("");
 
@@ -267,21 +240,19 @@ export default function ChatClient({ roomId, roomCode }) {
       : null;
 
     try {
-      const response = await fetch(`/api/rooms/${roomId}/messages`, {
+      const response = await fetch(`/api/rooms/${roomId}/channels/${channelId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message, replyTo: replyPayload }),
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send message");
-      }
+      if (!response.ok) throw new Error(data.error || "Failed to send message");
 
       const sentMessage = {
         _id: data.message._id,
         roomId,
+        channelId,
         senderId: data.message.senderId,
         senderName: data.message.senderName,
         message: data.message.message,
@@ -296,7 +267,6 @@ export default function ChatClient({ roomId, roomCode }) {
       };
 
       socket.emit("sendMessage", sentMessage);
-
       upsertMessage(sentMessage);
       setMessage("");
       setReplyDraft(null);
@@ -306,10 +276,9 @@ export default function ChatClient({ roomId, roomCode }) {
     }
   };
 
+  /* ─── Post announcement ─── */
   const postAnnouncement = async () => {
-    if (!canManageMessages) return;
-    if (!announcementText.trim()) return;
-
+    if (!canManageMessages || !announcementText.trim()) return;
     setSendError("");
 
     try {
@@ -318,16 +287,13 @@ export default function ChatClient({ roomId, roomCode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, message: announcementText }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to post announcement");
-      }
+      if (!response.ok) throw new Error(data.error || "Failed to post announcement");
 
       socket.emit("announcementCreated", {
         _id: data.message._id,
         roomId,
+        channelId,
         senderName: data.message.senderName,
         message: data.message.message,
         type: data.message.type,
@@ -345,37 +311,20 @@ export default function ChatClient({ roomId, roomCode }) {
     }
   };
 
-  const copyInviteCode = async () => {
-    try {
-      await navigator.clipboard.writeText(roomCode || "");
-      setCopiedInviteCode(true);
-      window.setTimeout(() => setCopiedInviteCode(false), 1400);
-      showToast("Room code copied");
-    } catch {
-      setSendError("Failed to copy invite code");
-    }
-  };
-
+  /* ─── Pin / delete / copy / reply ─── */
   const togglePin = async (messageId) => {
     if (!canManageMessages) return;
-
     setSendError("");
-
     try {
       const response = await fetch("/api/message/pin", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, messageId }),
       });
-
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to update pin");
 
-      socket.emit("messagePinned", {
-        roomId,
-        message: data.message,
-      });
-
+      socket.emit("messagePinned", { roomId, message: data.message });
       updatePinnedMessage({ roomId, message: data.message });
       setContextMenu(null);
       showToast(data.message?.isPinned ? "Message pinned" : "Message unpinned");
@@ -386,14 +335,11 @@ export default function ChatClient({ roomId, roomCode }) {
 
   const deleteMessage = async (messageId) => {
     if (!canManageMessages) return;
-
     setSendError("");
-
     try {
       const response = await fetch(`/api/rooms/${roomId}/messages/${messageId}`, {
         method: "DELETE",
       });
-
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to delete message");
 
@@ -407,8 +353,7 @@ export default function ChatClient({ roomId, roomCode }) {
   };
 
   const scrollToMessage = (messageId) => {
-    const target = document.getElementById(`message-${messageId}`);
-    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById(`message-${messageId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   const copyMessageText = async (text) => {
@@ -434,7 +379,6 @@ export default function ChatClient({ roomId, roomCode }) {
   const openContextMenu = (event, msg) => {
     event.preventDefault();
     event.stopPropagation();
-
     setContextMenu({
       messageId: msg._id,
       senderId: msg.senderId || null,
@@ -446,334 +390,265 @@ export default function ChatClient({ roomId, roomCode }) {
     });
   };
 
+  /* ─────────────────── RENDER ─────────────────── */
+  if (!channelId) {
+    return (
+      <div className="cc-empty-state">
+        <div className="cc-empty-icon">💬</div>
+        <p className="cc-empty-title">Select a room to start chatting</p>
+        <p className="cc-empty-sub">Choose a room from the sidebar on the left</p>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <div className="flex h-full gap-4 p-4 bg-white/50">
-        <div className="flex-1 flex flex-col gap-3">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-16 bg-slate-200 rounded-lg animate-pulse" />
-          ))}
-        </div>
-        <div className="w-72 space-y-4">
-          <div className="h-32 bg-slate-200 rounded-lg animate-pulse" />
-          <div className="h-32 bg-slate-200 rounded-lg animate-pulse" />
-        </div>
+      <div className="cc-loading">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className={`cc-loading-bubble ${i % 2 === 0 ? "cc-loading-bubble--left" : "cc-loading-bubble--right"}`} />
+        ))}
       </div>
     );
   }
 
   if (loadError) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">{loadError}</p>
-          <button 
-            onClick={() => router.push("/dashboard")}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Back to Dashboard
-          </button>
-        </div>
+      <div className="cc-error-state">
+        <p className="cc-error-text">{loadError}</p>
+        <button
+          onClick={() => router.push("/dashboard")}
+          className="cc-error-btn"
+        >
+          Back to Dashboard
+        </button>
       </div>
     );
   }
 
   return (
     <div
-      className="flex h-full bg-white overflow-hidden"
+      className="cc-root"
       onClick={() => setContextMenu(null)}
       onContextMenuCapture={() => setContextMenu(null)}
     >
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top toolbar with filters */}
-        {(announcements.length > 0 || pinnedMessages.length > 0) && (
-          <div className="border-b border-slate-200 px-6 py-3 flex gap-3">
-            {announcements.length > 0 && (
-              <button
-                onClick={() => setAnnouncementsOpen(!announcementsOpen)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  announcementsOpen
-                    ? "bg-blue-100 text-blue-700"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                📢 Announcements ({announcements.length})
-              </button>
-            )}
-            {pinnedMessages.length > 0 && (
-              <button
-                onClick={() => setPinnedOpen(!pinnedOpen)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  pinnedOpen
-                    ? "bg-amber-100 text-amber-700"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                📌 Pinned ({pinnedMessages.length})
-              </button>
-            )}
-          </div>
-        )}
+      {/* ── Channel header bar ── */}
+      <div className="cc-channel-bar">
+        <span className="cc-channel-hash">#</span>
+        <span className="cc-channel-label">{channelName || "channel"}</span>
 
-        {/* Announcements Panel */}
-        {announcementsOpen && announcements.length > 0 && (
-          <div className="border-b border-slate-200 bg-blue-50 p-4 max-h-48 overflow-y-auto">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-slate-900">Announcements</h3>
-              <button
-                onClick={() => setAnnouncementsOpen(false)}
-                className="text-slate-500 hover:text-slate-700"
-              >
-                ✕
-              </button>
+        {/* Announcement / Pinned toggles */}
+        <div className="cc-channel-filters">
+          {announcements.length > 0 && (
+            <button
+              onClick={() => setAnnouncementsOpen(!announcementsOpen)}
+              className={`cc-filter-btn ${announcementsOpen ? "cc-filter-btn--active-announce" : ""}`}
+            >
+              📢 Announcements ({announcements.length})
+            </button>
+          )}
+          {pinnedMessages.length > 0 && (
+            <button
+              onClick={() => setPinnedOpen(!pinnedOpen)}
+              className={`cc-filter-btn ${pinnedOpen ? "cc-filter-btn--active-pin" : ""}`}
+            >
+              📌 Pinned ({pinnedMessages.length})
+            </button>
+          )}
+          {pinnedMessages.length > 0 && (
+            <button
+              onClick={() => setPinnedOpen(!pinnedOpen)}
+              className="cc-view-all-btn"
+            >
+              View all pinned ↓
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Announcements Panel ── */}
+      {announcementsOpen && announcements.length > 0 && (
+        <div className="cc-panel cc-panel--announce">
+          <div className="cc-panel-header">
+            <h3 className="cc-panel-title">Announcements</h3>
+            <button onClick={() => setAnnouncementsOpen(false)} className="cc-panel-close" aria-label="Close">✕</button>
+          </div>
+          {canManageMessages && (
+            <div className="cc-announce-compose">
+              <textarea
+                value={announcementText}
+                onChange={(e) => setAnnouncementText(e.target.value)}
+                placeholder="Post an announcement..."
+                rows={2}
+                className="cc-announce-textarea"
+              />
+              <button onClick={postAnnouncement} className="cc-announce-post">Post</button>
             </div>
-            {canManageMessages && (
-              <div className="mb-3 pb-3 border-b border-blue-200">
-                <textarea
-                  value={announcementText}
-                  onChange={(e) => setAnnouncementText(e.target.value)}
-                  placeholder="Post an announcement..."
-                  rows={2}
-                  className="w-full p-2 text-sm border border-blue-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button
-                  onClick={postAnnouncement}
-                  className="mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
-                >
-                  Post
-                </button>
-              </div>
-            )}
-            <div className="space-y-2">
-              {announcements.slice(0, 5).map((item) => (
-                <div key={item._id} className="bg-white p-2 rounded text-sm border-l-2 border-blue-400">
-                  <div className="flex justify-between text-xs text-slate-600">
-                    <span className="font-medium">{item.senderName}</span>
-                    <span>{item.time}</span>
-                  </div>
-                  <p className="text-slate-800 mt-1">{item.message}</p>
+          )}
+          <div className="cc-announce-list">
+            {announcements.slice(0, 5).map((item) => (
+              <div key={item._id} className="cc-announce-item">
+                <div className="cc-announce-meta">
+                  <span className="cc-announce-sender">{item.senderName}</span>
+                  <span className="cc-announce-time">{item.time}</span>
                 </div>
-              ))}
-            </div>
+                <p className="cc-announce-body">{item.message}</p>
+              </div>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Pinned Messages Panel */}
-        {pinnedOpen && pinnedMessages.length > 0 && (
-          <div className="border-b border-slate-200 bg-amber-50 p-4 max-h-48 overflow-y-auto">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-slate-900">Pinned Messages</h3>
+      {/* ── Pinned Panel ── */}
+      {pinnedOpen && pinnedMessages.length > 0 && (
+        <div className="cc-panel cc-panel--pin">
+          <div className="cc-panel-header">
+            <h3 className="cc-panel-title">Pinned Messages</h3>
+            <button onClick={() => setPinnedOpen(false)} className="cc-panel-close" aria-label="Close">✕</button>
+          </div>
+          <div className="cc-pinned-list">
+            {pinnedMessages.map((item) => (
               <button
-                onClick={() => setPinnedOpen(false)}
-                className="text-slate-500 hover:text-slate-700"
+                key={item._id}
+                onClick={() => scrollToMessage(item._id)}
+                className="cc-pinned-item"
               >
-                ✕
+                <div className="cc-pinned-meta">
+                  <span className="cc-pinned-sender">{item.senderName}</span>
+                  <span className="cc-pinned-time">{item.time}</span>
+                </div>
+                <p className="cc-pinned-body">{item.message}</p>
               </button>
-            </div>
-            <div className="space-y-2">
-              {pinnedMessages.map((item) => (
-                <button
-                  key={item._id}
-                  onClick={() => scrollToMessage(item._id)}
-                  className="w-full bg-white p-2 rounded text-sm border-l-2 border-amber-400 hover:bg-amber-100 transition-colors text-left"
-                >
-                  <div className="flex justify-between text-xs text-slate-600">
-                    <span className="font-medium">{item.senderName}</span>
-                    <span>{item.time}</span>
-                  </div>
-                  <p className="text-slate-800 mt-1 truncate">{item.message}</p>
-                </button>
-              ))}
-            </div>
+            ))}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Messages Area */}
-        <div 
-          ref={messageBoardRef}
-          className="flex-1 overflow-y-auto px-6 py-4 space-y-4"
-        >
-          {messages.length === 0 ? (
-            <div className="h-full flex items-center justify-center">
-              <p className="text-slate-500 text-center">
-                No messages yet. Start the conversation! 💬
-              </p>
-            </div>
-          ) : (
-            messages.map((msg, i) => {
-              const isMe = msg.senderName === currentUserLabel;
-              const isAnnouncement = msg.type === "announcement";
+      {/* ── Messages Area ── */}
+      <div
+        ref={messageBoardRef}
+        className="cc-messages"
+      >
+        {messages.length === 0 ? (
+          <div className="cc-no-messages">
+            <p>No messages yet in this room. Start the conversation! 💬</p>
+          </div>
+        ) : (
+          messages.map((msg, i) => {
+            const isMe = msg.senderName === currentUserLabel;
+            const isAnnouncement = msg.type === "announcement";
 
-              return (
-                <div
-                  id={`message-${msg._id}`}
-                  key={`${msg._id || i}-${msg.time}`}
-                  className={`flex items-end gap-3 ${isMe ? "flex-row-reverse" : ""}`}
-                  onContextMenu={(event) => openContextMenu(event, msg)}
-                >
-                  {/* Avatar placeholder */}
-                  <div className={`w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold ${
-                    isMe 
-                      ? "bg-blue-500 text-white ring-4 ring-slate-100" 
-                      : isAnnouncement 
-                      ? "bg-purple-500 text-white ring-4 ring-purple-50" 
-                      : "bg-slate-300 text-slate-700 ring-4 ring-slate-50"
-                  }`}>
-                    {msg.senderName.charAt(0).toUpperCase()}
+            return (
+              <div
+                id={`message-${msg._id}`}
+                key={`${msg._id || i}-${msg.time}`}
+                className={`cc-msg ${isMe ? "cc-msg--me" : ""}`}
+                onContextMenu={(event) => openContextMenu(event, msg)}
+              >
+                {/* Avatar */}
+                <div className={`cc-msg-avatar ${isMe ? "cc-msg-avatar--me" : isAnnouncement ? "cc-msg-avatar--announce" : ""}`}>
+                  {String(msg.senderName || "?").charAt(0).toUpperCase()}
+                </div>
+
+                {/* Bubble */}
+                <div className={`cc-msg-bubble-wrap ${isMe ? "cc-msg-bubble-wrap--me" : ""}`}>
+                  <div className="cc-msg-meta">
+                    <span className="cc-msg-sender">{isMe ? "You" : msg.senderName}</span>
+                    <span className="cc-msg-time">{msg.time}</span>
+                    {msg.isPinned && <span className="cc-msg-pin-badge">📌</span>}
                   </div>
+
+                  {/* Reply quote */}
+                  {msg.replyTo?.senderName && msg.replyTo?.message && (
+                    <div className={`cc-reply-quote ${isMe ? "cc-reply-quote--me" : ""}`}>
+                      <p className="cc-reply-to">↳ {msg.replyTo.senderName}</p>
+                      <p className="cc-reply-body">{msg.replyTo.message}</p>
+                    </div>
+                  )}
 
                   {/* Message bubble */}
-                  <div className={`flex-1 max-w-md ${isMe ? "text-right" : ""}`}>
-                    <div className="flex items-center gap-2" style={{ justifyContent: isMe ? "flex-end" : "flex-start" }}>
-                      <span className={`text-sm font-semibold ${isMe ? "text-slate-700" : "text-slate-900"}`}>
-                        {isMe ? "You" : msg.senderName}
-                      </span>
-                      <span className={`text-xs ${isMe ? "text-slate-500" : "text-slate-500"}`}>{msg.time}</span>
-                      {msg.isPinned && <span className={`${isMe ? "text-slate-400" : "text-amber-600"} text-xs`}>📌</span>}
-                    </div>
-
-                    {/* Reply quote if present */}
-                    {msg.replyTo?.senderName && msg.replyTo?.message && (
-                      <div className={`mt-1.5 p-2 rounded border-l-2 border-slate-300 bg-slate-50 text-sm ${
-                        isMe ? "text-right" : ""
-                      }`}>
-                        <p className="text-xs text-slate-600 font-medium">
-                          ↳ {msg.replyTo.senderName}
-                        </p>
-                        <p className="text-slate-700 truncate">{msg.replyTo.message}</p>
-                      </div>
-                    )}
-
-                    {/* Main message */}
-                    <div className={`mt-1 px-4 py-2.5 rounded-2xl shadow-sm ${
-                      isMe
-                        ? "bg-gradient-to-br from-blue-500 to-blue-600"
-                        : isAnnouncement
-                        ? "bg-purple-100 text-purple-900 font-medium"
-                        : "bg-slate-100 text-slate-900"
-                    }`}>
-                      <p
-                        className={`break-words whitespace-pre-wrap font-medium ${isMe ? "text-white" : "text-inherit"}`}
-                        style={isMe ? { color: "#ffffff" } : undefined}
-                      >
-                        {msg.message}
-                      </p>
-                    </div>
+                  <div className={`cc-bubble ${
+                    isMe ? "cc-bubble--me" : isAnnouncement ? "cc-bubble--announce" : "cc-bubble--other"
+                  }`}>
+                    <p className="cc-bubble-text">{msg.message}</p>
                   </div>
                 </div>
-              );
-            })
-          )}
-          <div ref={endOfMessagesRef} />
-        </div>
-
-        {/* Reply Draft */}
-        {replyDraft && (
-          <div className="border-t border-slate-200 bg-blue-50 px-6 py-3">
-            <div className="flex items-center justify-between">
-              <div className="text-sm">
-                <p className="text-xs text-blue-700 font-medium">Replying to {replyDraft.senderName}</p>
-                <p className="text-slate-600 truncate">{replyDraft.message}</p>
               </div>
-              <button
-                onClick={() => setReplyDraft(null)}
-                className="ml-2 text-blue-600 hover:text-blue-800 font-bold"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
+            );
+          })
         )}
+        <div ref={endOfMessagesRef} />
+      </div>
 
-        {/* Input Area */}
-        <div className="border-t border-slate-200 bg-white p-4">
-          {sendError && (
-            <div className="mb-2 p-2 bg-red-50 text-red-700 text-sm rounded">
-              {sendError}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              placeholder="Type a message... (Enter to send)"
-              className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <button 
-              onClick={sendMessage}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            >
-              Send
-            </button>
+      {/* ── Reply Draft Banner ── */}
+      {replyDraft && (
+        <div className="cc-reply-banner">
+          <div className="cc-reply-info">
+            <p className="cc-reply-label">Replying to {replyDraft.senderName}</p>
+            <p className="cc-reply-preview">{replyDraft.message}</p>
           </div>
+          <button onClick={() => setReplyDraft(null)} className="cc-reply-dismiss" aria-label="Cancel reply">✕</button>
+        </div>
+      )}
+
+      {/* ── Input Area ── */}
+      <div className="cc-input-area">
+        {sendError && <div className="cc-send-error">{sendError}</div>}
+        <div className="cc-input-row">
+          {/* Emoji placeholder */}
+          <button type="button" className="cc-input-action" aria-label="Emoji" title="Emoji">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
+            </svg>
+          </button>
+
+          <input
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
+            placeholder="Type a message... (Enter to send)"
+            className="cc-input"
+            aria-label="Message input"
+          />
+
+          {/* Attachment placeholder */}
+          <button type="button" className="cc-input-action" aria-label="Attach file" title="Attach file">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z" />
+            </svg>
+          </button>
+
+          {/* Image placeholder */}
+          <button type="button" className="cc-input-action" aria-label="Send image" title="Image">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
+            </svg>
+          </button>
+
+          <button
+            onClick={sendMessage}
+            className="cc-send-btn"
+            disabled={!message.trim() || !channelId}
+            aria-label="Send message"
+          >
+            Send
+          </button>
         </div>
       </div>
 
-      {/* Right Sidebar */}
-      <div className="w-72 border-l border-slate-200 flex flex-col overflow-hidden">
-        {/* Online Members */}
-        <div className="flex-1 overflow-y-auto p-4 border-b border-slate-200">
-          <h3 className="text-sm font-semibold text-slate-900 mb-3">
-            Active Now ({onlineUsers.length})
-          </h3>
-          <p className="text-xs text-slate-600 mb-3">Live member presence</p>
-          
-          {onlineUsers.length > 0 ? (
-            <div className="space-y-2">
-              {onlineUsers.map((user) => (
-                <div
-                  key={`${user.id}-${user.email}`}
-                  className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
-                >
-                  <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-xs font-bold text-white">
-                    {user.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">{user.name}</p>
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full bg-green-500" />
-                      <span className="text-xs text-green-600">Online</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-slate-600">No one online right now</p>
-          )}
-        </div>
-
-        {/* Invite Code */}
-        <div className="p-4">
-          <h3 className="text-sm font-semibold text-slate-900 mb-2">Invite Code</h3>
-          <div className="flex items-center gap-2 p-3 bg-slate-100 rounded-lg border border-slate-300">
-            <code className="flex-1 font-mono text-sm font-bold text-slate-700">{roomCode}</code>
-            <button
-              onClick={copyInviteCode}
-              className="px-2 py-1 bg-white hover:bg-slate-200 rounded text-xs font-medium transition-colors"
-            >
-              {copiedInviteCode ? "✓" : "Copy"}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Context Menu */}
+      {/* ── Context Menu ── */}
       {contextMenu && (
         <div
-          className="fixed bg-white rounded-lg shadow-xl border border-slate-200 z-50"
+          className="cc-context-menu"
           style={{
             left: `${Math.min(contextMenu.x, window.innerWidth - 180)}px`,
             top: `${Math.min(contextMenu.y, window.innerHeight - 200)}px`,
           }}
-          onClick={(event) => event.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={() => replyToMessage({
@@ -782,29 +657,20 @@ export default function ChatClient({ roomId, roomCode }) {
               senderName: contextMenu.senderName,
               message: contextMenu.text,
             })}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 first:rounded-t-lg"
+            className="cc-ctx-item"
           >
             ↩ Reply
           </button>
-          <button
-            onClick={() => copyMessageText(contextMenu.text)}
-            className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-          >
+          <button onClick={() => copyMessageText(contextMenu.text)} className="cc-ctx-item">
             ⧉ Copy
           </button>
           {canManageMessages && (
             <>
-              <div className="border-t border-slate-200" />
-              <button
-                onClick={() => togglePin(contextMenu.messageId)}
-                className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-              >
+              <div className="cc-ctx-divider" />
+              <button onClick={() => togglePin(contextMenu.messageId)} className="cc-ctx-item">
                 📌 {contextMenu.isPinned ? "Unpin" : "Pin"}
               </button>
-              <button
-                onClick={() => deleteMessage(contextMenu.messageId)}
-                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 last:rounded-b-lg"
-              >
+              <button onClick={() => deleteMessage(contextMenu.messageId)} className="cc-ctx-item cc-ctx-item--danger">
                 🗑 Delete
               </button>
             </>
@@ -812,11 +678,9 @@ export default function ChatClient({ roomId, roomCode }) {
         </div>
       )}
 
-      {/* Toast Notification */}
+      {/* ── Toast ── */}
       {toast && (
-        <div className={`fixed bottom-4 right-4 px-4 py-3 rounded-lg text-white text-sm font-medium z-50 animate-pulse ${
-          toast.type === "error" ? "bg-red-500" : "bg-green-500"
-        }`}>
+        <div className={`cc-toast ${toast.type === "error" ? "cc-toast--error" : "cc-toast--success"}`}>
           {toast.message}
         </div>
       )}

@@ -3,6 +3,7 @@
 @import "./styles/room-chat.css";
 @import "./styles/landing.css";
 @import "./styles/login.css";
+@import "./styles/sidebars.css";
 
 :root {
   --background: #f3f6f4;

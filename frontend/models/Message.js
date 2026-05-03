@@ -8,6 +8,12 @@ const MessageSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    channelId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Channel",
+      default: null,
+      index: true,
+    },
     senderId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
