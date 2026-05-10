@@ -3,21 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useNotifications } from "@/providers/NotificationProvider";
 
 /* ─────────────────────────── SVG icons ─────────────────────────── */
 function IconHome() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
       <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
-    </svg>
-  );
-}
-
-function IconBell() {
-  return (
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true">
-      <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" />
     </svg>
   );
 }
@@ -76,7 +67,6 @@ export default function LeftSidebar({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { notifications } = useNotifications();
 
   const activeChannelId = searchParams.get("channel") || "";
 
@@ -88,8 +78,6 @@ export default function LeftSidebar({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
   const inputRef = useRef(null);
-
-  const unreadCount = notifications.filter((n) => !n.read).length;
 
   /* ── fetch channels ── */
   async function fetchChannels() {
@@ -181,19 +169,6 @@ export default function LeftSidebar({
             <span>Home</span>
           </Link>
 
-          <button
-            type="button"
-            className="ls-nav-item ls-nav-item--btn"
-            aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ""}`}
-          >
-            <span className="ls-nav-icon"><IconBell /></span>
-            <span>Notifications</span>
-            {unreadCount > 0 && (
-              <span className="ls-nav-badge" aria-label={`${unreadCount} unread`}>
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </button>
         </nav>
 
         <div className="ls-divider" role="separator" />

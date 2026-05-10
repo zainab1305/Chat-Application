@@ -235,15 +235,6 @@ export default async function Home() {
 
       <footer className="landing-footer">
         <p>Designed for modern team coordination without the usual visual noise.</p>
-        <nav aria-label="Footer links">
-          <a href="https://github.com/" target="_blank" rel="noreferrer">
-            GitHub Repository
-          </a>
-          <a href="mailto:hello@chatworkspace.app">Contact</a>
-          <a href="https://github.com/#readme" target="_blank" rel="noreferrer">
-            Project Details
-          </a>
-        </nav>
       </footer>
     </main>
   );

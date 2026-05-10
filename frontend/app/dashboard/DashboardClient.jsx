@@ -557,7 +557,7 @@ export default function DashboardClient() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-4 md:px-6 lg:px-8">
+    <div className="dashboard-internal min-h-screen bg-slate-50 px-4 py-4 md:px-6 lg:px-8">
       <div className="mx-auto max-w-[1440px]">
         <header className="sticky top-3 z-40 mb-5 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur md:px-5">
           <div className="flex flex-wrap items-center gap-3">
