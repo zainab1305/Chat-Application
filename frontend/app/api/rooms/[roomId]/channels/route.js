@@ -8,7 +8,6 @@ import { getRoomAccess } from "@/lib/roomRoles";
 /**
  * GET /api/rooms/[roomId]/channels
  * Returns all channels for a workspace.
- * If none exist, auto-creates a default "general" channel.
  */
 export async function GET(_, { params }) {
   try {
@@ -26,19 +25,9 @@ export async function GET(_, { params }) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
-    let channels = await Channel.find({ workspaceId: roomId })
+    const channels = await Channel.find({ workspaceId: roomId })
       .sort({ createdAt: 1 })
       .lean();
-
-    // Auto-create default "general" channel if workspace has none
-    if (channels.length === 0) {
-      const defaultChannel = await Channel.create({
-        workspaceId: roomId,
-        name: "general",
-        createdBy: access.user._id,
-      });
-      channels = [defaultChannel.toObject ? defaultChannel.toObject() : defaultChannel];
-    }
 
     const serialized = channels.map((ch) => ({
       _id: ch._id.toString(),

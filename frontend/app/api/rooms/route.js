@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { connectDB } from "@/lib/db";
 import Room from "@/models/Room";
+import Channel from "@/models/Channel";
 import { getUserFromSession, ROOM_ROLE } from "@/lib/roomRoles";
 
 function generateRoomCode(length = 6) {
@@ -101,6 +102,13 @@ export async function POST(req) {
           lastSeen: new Date(),
         },
       ],
+    });
+
+    // Create default "general" channel for the room
+    await Channel.create({
+      workspaceId: room._id,
+      name: "general",
+      createdBy: user._id,
     });
 
     return NextResponse.json({ room }, { status: 201 });
