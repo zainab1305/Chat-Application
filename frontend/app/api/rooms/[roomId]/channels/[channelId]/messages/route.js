@@ -102,7 +102,11 @@ export async function POST(req, { params }) {
         normalizedReply && normalizedReply.senderName && normalizedReply.message
           ? normalizedReply
           : undefined,
-      time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      time: now.toLocaleTimeString('en-IN', {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Asia/Kolkata",
+      }),
     });
 
     await Room.findByIdAndUpdate(roomId, { $set: { updatedAt: now } });

@@ -67,10 +67,11 @@ function formatDate(dateString) {
   if (!dateString) return "—";
   const d = new Date(dateString);
   if (Number.isNaN(d.getTime())) return "—";
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat("en-IN", {
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: "Asia/Kolkata",
   }).format(d);
 }
 
