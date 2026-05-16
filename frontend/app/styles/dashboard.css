@@ -50,7 +50,7 @@
   max-width: none;
 }
 
-.dashboard-internal header,
+.dashboard-internal > .mx-auto > header,
 .dashboard-internal section,
 .dashboard-internal aside > section,
 .dashboard-internal .fixed .max-w-md {
@@ -60,7 +60,7 @@
   backdrop-filter: blur(18px);
 }
 
-.dashboard-internal header {
+.dashboard-internal > .mx-auto > header {
   top: 12px;
   border-radius: 24px !important;
 }
@@ -72,6 +72,7 @@
 
 .dashboard-internal > .mx-auto > .grid {
   grid-template-columns: minmax(0, 1fr) minmax(320px, 360px) !important;
+  gap: 24px !important;
 }
 
 .dashboard-internal > .mx-auto > .grid > section.space-y-4 > .rounded-2xl:first-child {
@@ -79,7 +80,20 @@
 }
 
 .dashboard-internal > .mx-auto > .grid > section.space-y-4 > .rounded-2xl:nth-child(2) {
-  min-height: calc(100vh - 260px);
+  min-height: clamp(420px, calc(100vh - 320px), 820px);
+}
+
+.dashboard-internal aside > section {
+  padding: 18px !important;
+}
+
+.dashboard-internal aside > section .grid.gap-2 {
+  gap: 10px !important;
+}
+
+.dashboard-internal aside > section:first-child .grid.gap-2 > button {
+  min-height: 44px;
+  white-space: normal;
 }
 
 .dashboard-internal .grid.h-9.w-9,
@@ -225,7 +239,19 @@
     padding: 12px !important;
   }
 
-  .dashboard-internal header {
+  .dashboard-internal > .mx-auto > header {
     position: static;
+  }
+
+  .dashboard-internal > .mx-auto > .grid {
+    gap: 16px !important;
+  }
+
+  .dashboard-internal aside > section {
+    padding: 14px !important;
+  }
+
+  .dashboard-internal aside > section .grid.gap-2 {
+    gap: 8px !important;
   }
 }

@@ -557,9 +557,9 @@ export default function DashboardClient() {
   }
 
   return (
-    <div className="dashboard-internal min-h-screen bg-slate-50 px-4 py-4 md:px-6 lg:px-8">
+    <div className="dashboard-internal min-h-screen bg-slate-50 px-4 py-5 md:px-6 md:py-6 lg:px-8">
       <div className="mx-auto max-w-[1440px]">
-        <header className="sticky top-3 z-40 mb-5 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur md:px-5">
+        <header className="sticky top-3 z-40 mb-6 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-sm backdrop-blur md:px-5 md:py-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="mr-2 flex items-center gap-2 min-w-[180px]">
               <div className="grid h-9 w-9 place-items-center rounded-xl bg-slate-900 text-sm font-bold text-white">W</div>
@@ -612,13 +612,13 @@ export default function DashboardClient() {
 
         {error ? <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
 
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(330px,1fr)]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(330px,1fr)] xl:gap-7">
           <section className="space-y-4">
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h1 className="text-xl font-bold text-slate-900 md:text-2xl">Workspace Overview</h1>
-                  <p className="text-sm text-slate-600">Manage rooms, track updates, and keep your team aligned.</p>
+                  <p className="mt-3 text-sm leading-relaxed text-slate-600">Manage rooms, track updates, and keep your team aligned.</p>
                 </div>
 
                 <button
@@ -705,11 +705,11 @@ export default function DashboardClient() {
             </div>
           </section>
 
-          <aside className="space-y-4">
+          <aside className="space-y-5">
             <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">Quick Actions</h2>
 
-              <div className="grid gap-2">
+              <div className="mt-1 grid gap-2">
                 <button
                   type="button"
                   onClick={() => setModalOpen("create")}
@@ -918,7 +918,7 @@ export default function DashboardClient() {
                     <select
                       value={uploadRoomId}
                       onChange={(event) => setUploadRoomId(event.target.value)}
-                      className="h-10 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
+                      className="h-11 rounded-xl border border-slate-200 px-3.5 pr-10 text-sm leading-normal text-slate-800 outline-none appearance-none focus:border-slate-400"
                       required
                     >
                       <option value="">Select room</option>
@@ -930,7 +930,7 @@ export default function DashboardClient() {
                     <select
                       value={uploadType}
                       onChange={(event) => setUploadType(event.target.value)}
-                      className="h-10 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
+                      className="h-11 rounded-xl border border-slate-200 px-3.5 pr-10 text-sm leading-normal text-slate-800 outline-none appearance-none focus:border-slate-400"
                     >
                       <option value="link">Link</option>
                       <option value="file">File</option>
@@ -942,14 +942,14 @@ export default function DashboardClient() {
                         value={uploadUrl}
                         onChange={(event) => setUploadUrl(event.target.value)}
                         placeholder="https://example.com"
-                        className="h-10 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
+                        className="h-11 rounded-xl border border-slate-200 px-3.5 text-sm leading-normal text-slate-800 outline-none focus:border-slate-400"
                         required
                       />
                     ) : (
                       <input
                         type="file"
                         onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
-                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                        className="h-11 rounded-xl border border-slate-200 px-3 py-2 text-sm leading-normal text-slate-800"
                         required
                       />
                     )}
@@ -959,7 +959,7 @@ export default function DashboardClient() {
                       value={uploadName}
                       onChange={(event) => setUploadName(event.target.value)}
                       placeholder="Optional display name"
-                      className="h-10 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-slate-400"
+                      className="h-11 rounded-xl border border-slate-200 px-3.5 text-sm leading-normal text-slate-800 outline-none focus:border-slate-400"
                     />
 
                     <div className="mt-1 flex justify-end gap-2">
