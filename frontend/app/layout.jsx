@@ -10,7 +10,7 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata = {
-  title: "Chat App",
+  title: "WorkspaceOne",
   description: "Real-time chat using Socket.IO",
 };
 
