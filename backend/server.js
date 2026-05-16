@@ -5,7 +5,7 @@ const cors = require("cors");
 
 const app = express();
 
-const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:3000";
+const CLIENT_URL = process.env.CLIENT_URL?.split(",") || "*";
 
 app.use(cors({
   origin: CLIENT_URL,
