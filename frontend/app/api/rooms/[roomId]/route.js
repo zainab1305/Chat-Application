@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import Message from "@/models/Message";
+import Room from "@/models/Room";
 import { getRoomAccess } from "@/lib/roomRoles";
 
 export async function DELETE(_, { params }) {
