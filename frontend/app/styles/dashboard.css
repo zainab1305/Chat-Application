@@ -255,3 +255,70 @@
     gap: 8px !important;
   }
 }
+
+/* Medium screens: stack layout and make sidebar flow under main content */
+@media (max-width: 1280px) {
+  .dashboard-internal > .mx-auto > .grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-internal > .mx-auto > .grid > aside {
+    margin-top: 18px;
+  }
+
+  .dashboard-internal header {
+    padding-block: 14px !important;
+  }
+
+  .dashboard-internal aside > section {
+    padding: 16px !important;
+  }
+
+  .dashboard-internal aside > section .grid.gap-2 > button {
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .dashboard-internal h1 {
+    font-size: clamp(1.5rem, 4.2vw, 2.1rem) !important;
+  }
+
+  .dashboard-internal .rounded-2xl {
+    padding: 14px !important;
+  }
+
+  .dashboard-internal .grid.md\:grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Ensure selects/inputs take full width on small screens inside modals/forms */
+@media (max-width: 640px) {
+  .dashboard-internal select,
+  .dashboard-internal input[type="url"],
+  .dashboard-internal input[type="text"],
+  .dashboard-internal input[type="file"] {
+    width: 100% !important;
+    box-sizing: border-box;
+  }
+}
+
+/* Custom select chevron for consistency */
+.dashboard-internal select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M6 8l4 4 4-4' stroke='%231e6b4f' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px;
+  padding-right: 2.75rem !important;
+}
+
+@media (max-width: 640px) {
+  .dashboard-internal select {
+    background-position: right 10px center;
+    background-size: 12px;
+  }
+}
