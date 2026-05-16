@@ -96,6 +96,16 @@ export default function DashboardClient() {
     showToast.timeoutId = window.setTimeout(() => setToast(null), 2400);
   }
 
+  const handleLogout = async () => {
+    setProfileOpen(false);
+    try {
+      await signOut({ redirect: false });
+    } catch (e) {
+      // ignore
+    }
+    router.push("/login");
+  };
+
   const greetingName = useMemo(() => {
     if (!session?.user?.name) return session?.user?.email || "there";
     return session.user.name;
@@ -380,14 +390,14 @@ export default function DashboardClient() {
   }, []);
 
   useEffect(() => {
-    function handlePointerDown(event) {
+    function handleClickOutside(event) {
       if (!profileMenuRef.current?.contains(event.target)) {
         setProfileOpen(false);
       }
     }
 
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -599,7 +609,7 @@ export default function DashboardClient() {
                   <div className="absolute right-0 mt-2 w-44 rounded-xl border border-slate-200 bg-white p-1 shadow-lg">
                     <button
                       type="button"
-                      onClick={() => signOut({ callbackUrl: "/login" })}
+                      onClick={handleLogout}
                       className="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
                     >
                       Logout

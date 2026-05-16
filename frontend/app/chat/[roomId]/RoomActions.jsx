@@ -22,8 +22,8 @@ export default function RoomActions({ roomId, roomCode, isOwner }) {
     }
 
     if (isDropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
     }
   }, [isDropdownOpen]);
 
@@ -91,9 +91,14 @@ export default function RoomActions({ roomId, roomCode, isOwner }) {
     router.push("/dashboard");
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsDropdownOpen(false);
-    signOut({ callbackUrl: "/login" });
+    try {
+      await signOut({ redirect: false });
+    } catch (e) {
+      // ignore - we'll navigate regardless
+    }
+    router.push("/login");
   };
 
   return (
